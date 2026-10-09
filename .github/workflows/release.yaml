@@ -1,0 +1,68 @@
+name: Release from CHANGELOG.md
+
+# On every push to main: if the newest version in CHANGELOG.md has no GitHub release yet,
+# create one (tag vX.Y.Z) with that version's entries as the release notes.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # full history, so existing tags are visible
+
+      - name: Extract version and notes from CHANGELOG.md
+        id: changelog
+        run: |
+          # Newest release heading, e.g. "## [0.2.0] - 2026-11-01" (an "Unreleased" heading is skipped).
+          version=$(grep -m1 -oP '^## \[\K[0-9]+\.[0-9]+\.[0-9]+(?=\])' CHANGELOG.md)
+          if [ -z "$version" ]; then
+            echo "No version found in CHANGELOG.md"
+            exit 1
+          fi
+
+          # The version the app shows comes from package.json; refuse to release if they disagree.
+          pkg_version=$(node -p "require('./package.json').version")
+          if [ "$version" != "$pkg_version" ]; then
+            echo "CHANGELOG.md is at $version but package.json is at $pkg_version."
+            echo "Run: npm version $version --no-git-tag-version"
+            exit 1
+          fi
+
+          # Everything under that heading, up to the next version heading.
+          awk '/^## \[[0-9]/ { n++; next } n == 1' CHANGELOG.md > release-notes.md
+
+          echo "Releasing $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${{ steps.changelog.outputs.version }}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.changelog.outputs.version }}" \
+            --target "$GITHUB_SHA" \
+            --title "PondCube Collect ${{ steps.changelog.outputs.version }}" \
+            --notes-file release-notes.md
+
+      - name: Skip release creation
+        if: steps.check_tag.outputs.exists == 'true'
+        run: echo "Release v${{ steps.changelog.outputs.version }} already exists. Skipping."

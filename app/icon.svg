@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .edge { stroke: #134e4a; }
+    @media (prefers-color-scheme: dark) { .edge { stroke: #99f6e4; } }
+  </style>
+  <polygon points="32,22 54.5,35 32,48 9.5,35" fill="#5eead4"/>
+  <polygon points="9.5,35 32,48 32,58 9.5,45" fill="#14b8a6"/>
+  <polygon points="32,48 54.5,35 54.5,45 32,58" fill="#0f766e"/>
+  <path class="edge" d="M32 6L54.5 19V45L32 58L9.5 45V19Z M9.5 19L32 32L54.5 19 M32 32V58" fill="none" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,101 @@
+// Record intake self-check (lib/intake.ts) against in-memory Postgres (PGLite): same tables as Neon,
+// generated from lib/schema.ts, no network or DATABASE_URL. Run: npm run check
+import assert from "node:assert/strict";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { count, eq } from "drizzle-orm";
+import type { PgTable } from "drizzle-orm/pg-core";
+import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
+import * as schema from "../lib/schema";
+import { createRecordIntake, type AtomicWriter } from "../lib/intake";
+
+async function main() {
+  const client = new PGlite();
+  const db = drizzle(client);
+  for (const statement of await generateMigration(generateDrizzleJson({}), generateDrizzleJson(schema))) {
+    await client.exec(statement);
+  }
+
+  // Test adapter at the intake seam: a PGLite transaction (Neon's adapter uses batch).
+  const pgliteWriter: AtomicWriter = (inserts) =>
+    db.transaction(async (tx) => {
+      for (const { table, rows } of inserts) await tx.insert(table).values(rows);
+    });
+  const intake = createRecordIntake(pgliteWriter);
+
+  await db.insert(schema.assets).values({
+    pondCode: "PEN-FT1-001",
+    displayName: "Fish Tank 1 - #1",
+    site: "Penang HQ",
+    siteCode: "PEN",
+    area: "Fish Tank 1",
+    areaCode: "FT1",
+    zone: "Fish Tank 1",
+    unitType: "tank",
+  });
+  const who = { pondCode: "PEN-FT1-001", enumerator: "Operator 1" };
+  const recordedAt = new Date("2026-10-09T00:30:00.000Z");
+  const rows = async (table: PgTable) => (await db.select({ n: count() }).from(table))[0].n;
+
+  // Each kind round-trips through one interface.
+  await intake.save("wq", {
+    ...who,
+    recordedAt,
+    period: "morning",
+    dissolvedOxygen: "6.5",
+    temperature: "28.4",
+    ph: "",
+    remarks: "",
+  });
+  const [wq] = await db.select().from(schema.wqReadings);
+  assert.equal(wq.dissolvedOxygen, 6.5);
+  assert.equal(wq.ph, null);
+  assert.equal(wq.recordedAt.toISOString(), recordedAt.toISOString(), "recorded-at keeps its instant");
+  await intake.save("feeding", { ...who, recordedAt, feedType: "pellet", feedAmountKg: "3.5", feedingsCount: "2" });
+  await intake.save("mortality", { ...who, recordedAt, mortalityCount: "3", suspectedCause: "water_quality" });
+  assert.equal(await rows(schema.feedingEvents), 1);
+  assert.equal((await db.select().from(schema.mortalityEvents))[0].suspectedCause, "water_quality");
+
+  // Sampling: event + measured fish in one write; blank rows are skipped.
+  await intake.save("sampling", {
+    ...who,
+    recordedAt,
+    notes: "batch 7",
+    fish: [{ weightG: "120", lengthCm: "18" }, { weightG: "", lengthCm: "" }, { weightG: "95" }],
+  });
+  const [event] = await db.select().from(schema.samplingEvents);
+  const fish = await db
+    .select()
+    .from(schema.fishMeasurements)
+    .where(eq(schema.fishMeasurements.samplingEventId, event.id));
+  assert.equal(fish.length, 2);
+
+  // Invalid input writes nothing: ranges, whole numbers, offset-less time, unknown kind.
+  await assert.rejects(
+    intake.save("wq", { ...who, recordedAt, period: "morning", dissolvedOxygen: "25", temperature: "28" }),
+  );
+  await assert.rejects(intake.save("mortality", { ...who, recordedAt, mortalityCount: "2.5" }));
+  await assert.rejects(intake.save("mortality", { ...who, recordedAt: "2026-10-09T08:00", mortalityCount: "1" }));
+  await assert.rejects(intake.save("sampling", { ...who, recordedAt, fish: [{ weightG: "", lengthCm: "" }] }));
+  await assert.rejects(intake.save("bogus" as "wq", { ...who, recordedAt } as never)); // deliberately ill-typed
+  assert.equal(await rows(schema.wqReadings), 1);
+  assert.equal(await rows(schema.mortalityEvents), 1);
+
+  // Unknown pond: the foreign key rejects it.
+  await assert.rejects(intake.save("mortality", { ...who, pondCode: "PEN-NOPE-999", recordedAt, mortalityCount: "1" }));
+
+  // Atomic: if the fish insert fails, the sampling event is not kept either.
+  await client.exec("ALTER TABLE fish_measurements RENAME TO fish_measurements_off");
+  await assert.rejects(intake.save("sampling", { ...who, recordedAt, fish: [{ weightG: "50" }] }));
+  await client.exec("ALTER TABLE fish_measurements_off RENAME TO fish_measurements");
+  assert.equal(await rows(schema.samplingEvents), 1, "no orphan sampling event");
+
+  // (Field names vs columns are checked when lib/intake.ts loads: reaching this line means they match.)
+  await client.close();
+  console.log("record intake OK");
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

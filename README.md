@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PondCube · Collect
 
-## Getting Started
+A field data collection app for WorldFish's PondCube aquaculture facility at the
+Penang headquarters. It lets the people working the ponds record what they observe
+— water quality, feeding, mortality and fish sampling — from a phone or tablet at
+the pondside, and keeps that data clean, consistent and in one place.
 
-First, run the development server:
+## Why it exists
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+WorldFish improves aquatic food systems to reduce hunger and poverty, and that
+work runs on trustworthy data. A culture pond only tells its story if the daily
+observations about it — the oxygen that dipped overnight, the feed that went in,
+the fish that died, the sample that showed growth — are captured reliably and can
+be compared across ponds and over time.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+PondCube Collect exists to make those observations:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **easy to record** where they happen, by the people who make them, without
+  training on a complex tool;
+- **trustworthy**, by catching impossible values the moment they're entered;
+- **resilient**, so a dropped signal or a closed tab never loses a reading;
+- **connected**, so manual records sit in the same dataset as the pond registry
+  and, in time, the facility's sensor data — every record tied to the pond it
+  belongs to.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## What it does
 
-## Learn More
+**One place, one pond, one observation at a time.** An operator opens the app,
+says who they are and which pond they're standing at, and records what they see.
 
-To learn more about Next.js, take a look at the following resources:
+The four kinds of observation:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Water quality** — dissolved oxygen and temperature, plus pH, ammonia, nitrite
+  and nitrate when taken, logged for the morning or afternoon round.
+- **Feeding** — how much feed went into the pond, with feed type and number of
+  feedings.
+- **Mortality** — how many fish were removed dead, and the suspected cause.
+- **Sampling** — a batch of individual fish weights and lengths, captured together
+  as one sampling event.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## What makes it fit the field
 
-## Deploy on Vercel
+- **Every pond, found fast.** All 296 coded ponds across the site — earthen ponds,
+  fish tanks, hatchery and storage tanks — are searchable from one picker, so the
+  right pond is two taps away.
+- **Built for a phone at the pondside.** Large touch targets, a layout that works
+  one-handed, and no fiddly controls.
+- **No logins to slow anyone down.** Operators pick their name from a list; a
+  single shared site code, entered once per device, is all that gates saving.
+- **Nothing lost to a bad signal.** A half-finished record is saved on the device
+  as you go and is still there after a refresh, a lost connection, or switching
+  ponds. It clears only once the record is safely saved.
+- **Bad numbers can't get in.** A reading outside its plausible range (say
+  dissolved oxygen above 20 mg/L) is refused as it's typed — and checked again
+  before it's stored — so the dataset stays clean at the source.
+- **Continuous with the past.** Each pond carries how it was named in the old
+  records, so new observations line up with the facility's history instead of
+  starting from scratch.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Where the data goes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Records are written to a single aquaculture database for the facility, hosted close
+to Penang. The pond registry is maintained in Airtable as the human-friendly place
+to add and edit ponds, and flows from there into the collection database. Sensor
+data from the facility is planned to join the same database, meeting the manual
+records pond-by-pond.
+
+## For developers
+
+Setup, infrastructure, the data model and deployment are documented in
+[`docs/architecture.md`](docs/architecture.md). The shared domain vocabulary is in
+[`docs/glossary.md`](docs/glossary.md), and working conventions for this codebase
+are in [`CLAUDE.md`](CLAUDE.md).
