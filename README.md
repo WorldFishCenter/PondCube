@@ -1,3 +1,5 @@
+<img src="app/icon.svg" alt="PondCube logo" width="80" align="right">
+
 # PondCube · Collect
 
 A field data collection app for WorldFish's PondCube aquaculture facility at the
