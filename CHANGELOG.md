@@ -4,6 +4,13 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.1.1] - 2026-10-11
+
+### Fixed
+
+- Ponds removed from Airtable now disappear from the pond list (their past records are kept).
+- Copying ponds and operators from Airtable now checks everything first: a typo, a duplicate or a renamed column stops the copy with a clear list of what to fix, instead of quietly changing the app's lists.
+
 ## [0.1.0] - 2026-10-10
 
 First version.

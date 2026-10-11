@@ -19,15 +19,15 @@ Hosted on Vercel (functions pinned to Singapore). Node 20+.
 
 ## Commands
 
-| Command                                       | Does                                                                                                                 |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev` / `build` / `start`             | Next.js                                                                                                              |
-| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                        |
-| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                              |
-| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, record intake — all against in-memory Postgres (PGLite, no network) |
-| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                             |
-| `npm run db:sync`                             | Copy ponds + operators from Airtable into the branch in `DATABASE_URL` (upsert)                                      |
-| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                 |
+| Command                                       | Does                                                                                                                            |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev` / `build` / `start`             | Next.js                                                                                                                         |
+| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                   |
+| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                         |
+| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, record intake, Airtable sync — against in-memory Postgres (PGLite, no network) |
+| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                        |
+| `npm run db:sync`                             | Check, then copy ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`        |
+| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                            |
 
 Run `npm run check`, `npm run typecheck` and `npm run format:check` before committing.
 

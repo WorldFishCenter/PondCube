@@ -62,10 +62,19 @@ The Airtable base **PondCube** is where people add and edit ponds (`ponds` table
 operators (`operators` table: `name`, `active`, `notes`) by hand. Neon is the system
 of record the app reads and writes. The flow is one-way:
 **Airtable → `npm run db:sync` → Neon `assets` / `operators`** (or one table:
-`db:sync-ponds`, `db:sync-operators`). It upserts, so re-run it after edits; keep the
-column names matching. Never edit ponds or operators directly in
-Neon. To retire an operator, untick `active` or remove the row: either way the sync
-deactivates them in Neon (never deletes), so past records keep the name.
+`db:sync-ponds`, `db:sync-operators`). It upserts, so re-run it after edits. Never edit
+ponds or operators directly in Neon.
+
+- **Checked first, all-or-nothing.** Every Airtable row is checked (required columns,
+  numbers, dates, pond code format, duplicates) before anything is written; any problem
+  is listed and nothing changes. The write itself is a single all-or-nothing step.
+- **Retiring.** A pond removed from Airtable is set to `retired` in Neon (hidden from the
+  app, kept for its records); re-adding it makes it active again. To retire an operator,
+  untick `active` or remove the row: either way they're deactivated, never deleted, so
+  past records keep the name.
+- **Production needs `--prod`.** `npm run db:sync -- --prod` writes to `DATABASE_URL_PROD`;
+  without the flag the sync refuses to write if `DATABASE_URL` is the production database.
+  It prints the target and what will change before writing.
 
 ### Vercel — hosting
 
@@ -127,5 +136,5 @@ npm run dev         # http://localhost:3000
 3. Apply the schema to production once:
    ```bash
    DATABASE_URL="<main branch url>" npx drizzle-kit push
-   DATABASE_URL="<main branch url>" npm run db:sync
+   npm run db:sync -- --prod   # needs DATABASE_URL_PROD in .env
    ```
