@@ -47,8 +47,8 @@ The four kinds of observation:
   right pond is two taps away.
 - **Built for a phone at the pondside.** Large touch targets, a layout that works
   one-handed, and no fiddly controls.
-- **No logins to slow anyone down.** Operators pick their name from a list; a
-  single shared site code, entered once per device, is all that gates saving.
+- **One sign-in, then out of the way.** Each operator signs in once on their device
+  with their own account, and every record they save carries their name.
 - **Nothing lost to a bad signal.** A half-finished record is saved on the device
   as you go and is still there after a refresh, a lost connection, or switching
   ponds. It clears only once the record is safely saved.

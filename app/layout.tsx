@@ -1,3 +1,5 @@
+import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -24,10 +26,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body className="min-h-svh antialiased">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
-          <footer className="pb-6 text-center text-xs text-muted-foreground">PondCube Collect v{pkg.version}</footer>
-        </ThemeProvider>
+        {/* Clerk's styles go in Tailwind's components layer: above preflight, below utilities, so the
+            shadcn theme's classes win. (A custom layer would need an @layer order line, which the CSS build drops.) */}
+        <ClerkProvider appearance={{ theme: shadcn, cssLayerName: "components" }}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            {children}
+            <footer className="pb-6 text-center text-xs text-muted-foreground">PondCube Collect v{pkg.version}</footer>
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

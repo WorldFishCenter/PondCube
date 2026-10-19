@@ -74,7 +74,14 @@ const pondRow = z
     notes: r.notes,
   }));
 
-const operatorRow = z.object({ name: required, active: z.boolean({ error: "should be a checkbox" }).default(false) }); // unticked = omitted
+const email = text
+  .transform((s) => s.toLowerCase() || null)
+  .pipe(z.email({ error: "is not an email address" }).nullable());
+const operatorRow = z.object({
+  name: required,
+  email,
+  active: z.boolean({ error: "should be a checkbox" }).default(false), // unticked = omitted
+});
 
 /** Checks every Airtable row; any problem means nothing should be written. */
 export function planSync(rows: AirtableRows): { plan: SyncPlan; problems: string[] } {
@@ -88,8 +95,15 @@ export function planSync(rows: AirtableRows): { plan: SyncPlan; problems: string
     plan.operators = checkRows("operators", "name", rows.operators, operatorRow, (o) => o.name.toLowerCase(), problems);
     if (!plan.operators.some((o) => o.active))
       problems.push(
-        "operators: none would be active (was the `active` column renamed?); refusing to empty the pick-list",
+        "operators: none would be active (was the `active` column renamed?); refusing to empty the operator list",
       );
+    // One account signs in as one operator.
+    const emails = new Map<string, string>();
+    for (const o of plan.operators) {
+      if (!o.email) continue;
+      if (emails.has(o.email)) problems.push(`operators: ${o.name} has the same email as ${emails.get(o.email)}`);
+      else emails.set(o.email, o.name);
+    }
   }
   return { plan, problems };
 }
@@ -173,7 +187,7 @@ export function syncQueries(db: Db, plan: SyncPlan): BatchItem<"pg">[] {
         .insert(operators)
         .values(plan.operators)
         .onConflictDoUpdate({ target: operators.name, set: excluded(operators, plan.operators[0]) }),
-      // Removed or renamed in Airtable: leaves the pick-list; past records keep the name.
+      // Removed or renamed in Airtable: can no longer sign in; past records keep the name.
       db
         .update(operators)
         .set({ active: false })
