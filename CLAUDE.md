@@ -40,6 +40,9 @@ app/layout.tsx            Inter font (shadcn preset), viewport, ClerkProvider (s
 app/sign-in, app/sign-up  Clerk's sign-in / sign-up pages; proxy.ts = clerkMiddleware (routes stay public)
 app/globals.css           shadcn theme tokens (incl. --logo-outline) + 44px touch-target rule
 app/icon.svg              Favicon (outline follows OS theme); apple-icon.png = iOS home screen
+app/manifest.ts           Web app manifest (installable); icons in public/icon-*.png
+public/sw.js              Service worker: last page + build files kept so the app opens offline
+components/service-worker.tsx   Registers public/sw.js
 components/ui/*            Stock shadcn components (Base UI). Do NOT edit by hand.
 components/theme-provider.tsx, theme-toggle.tsx   shadcn dark mode (next-themes); one-tap light↔dark switch
 components/pondcube-logo.tsx   Logo mark for in-app use (same artwork as app/icon.svg)

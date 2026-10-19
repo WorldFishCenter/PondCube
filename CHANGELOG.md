@@ -4,6 +4,13 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.3.0] - 2026-10-19
+
+### Added
+
+- The app can be installed on a phone or tablet: use "Add to Home screen" (or "Install app") in the browser. It then opens full-screen with its own PondCube icon.
+- Once installed, the app also opens without signal, so you can start a record at the pond. Saving still needs signal; until then the record is kept on the device as a draft.
+
 ## [0.2.0] - 2026-10-19
 
 ### Changed

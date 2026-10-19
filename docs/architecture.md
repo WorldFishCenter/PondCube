@@ -92,6 +92,16 @@ sends. Emails are edited in Airtable (`email` column on `operators`) and synced.
 Anyone can create an account, but one whose email isn't on the list can't record.
 Removing or deactivating an operator locks them out within about a minute.
 
+### Installable app (PWA)
+
+`app/manifest.ts` makes the app installable (Add to Home screen) and opens it
+full-screen. `public/sw.js`, a hand-written service worker, keeps the last page that
+loaded plus its build files on the device, so the app opens with no signal and
+records can be drafted there. Saving still needs signal: a save made offline fails
+and keeps its draft. The kept page is replaced on every load with signal. It is
+first kept on the second load, because the first load comes before the worker is
+running. Test it with `next build && next start`, not `next dev`.
+
 ## Roadmap / open decisions
 
 - **Mandible sensor data** lands in the same Neon database in its own table(s).
