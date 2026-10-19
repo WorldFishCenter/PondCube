@@ -4,6 +4,18 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.2.0] - 2026-10-19
+
+### Changed
+
+- Each operator now signs in with their own account instead of entering a shared site code. Every device needs to sign in once after this update.
+- Records are saved under the name of whoever is signed in, so you no longer pick your name at the top.
+- The "Penang HQ" label at the top of the screen is gone.
+
+### Added
+
+- Operators' email addresses are kept in Airtable next to their names. Signing in with that email is what lets someone record; anyone else sees a message to ask their supervisor.
+
 ## [0.1.1] - 2026-10-11
 
 ### Fixed

@@ -1,20 +1,21 @@
 import "server-only";
 import { cacheLife } from "next/cache";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "./db";
 import { assets, operators } from "./schema";
 
 // Page reads live here, not in actions.ts: every export of a "use server" file is a public endpoint.
 // Cached so the page prerenders and skips Neon on each request; DB edits show up within ~1 minute.
 
-export async function getOperators() {
+/** The active operator with this (lowercase) email, by name, or null. */
+export async function getOperatorName(email: string) {
   "use cache";
   cacheLife("minutes");
-  return db
+  const [row] = await db
     .select({ name: operators.name })
     .from(operators)
-    .where(eq(operators.active, true))
-    .orderBy(asc(operators.name));
+    .where(and(eq(operators.email, email), eq(operators.active, true)));
+  return row?.name ?? null;
 }
 
 export async function getPonds() {

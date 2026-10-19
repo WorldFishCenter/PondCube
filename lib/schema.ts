@@ -25,10 +25,11 @@ export const assets = pgTable("assets", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ---- Operators (pick-list, no auth in v1) ----
+// ---- Operators (each signs in with the account whose email matches theirs) ----
 export const operators = pgTable("operators", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull().unique(),
+  email: text("email").unique(), // lowercase; no email = can't sign in
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

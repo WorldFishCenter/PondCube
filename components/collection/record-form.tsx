@@ -73,7 +73,7 @@ export function useRecordForm<K extends RecordKind, TValues extends FieldValues,
       // The form schema plus who/where and the instant is the kind's save input; intake re-validates.
       const outcome = await saveRecord(kind, { ...record, ...who, recordedAt: at.data } as RecordInput<K>);
       if (outcome === "locked") {
-        setResult({ ok: false, msg: "Enter the site code again. Your entry is kept as a draft." });
+        setResult({ ok: false, msg: "Sign in again. Your entry is kept as a draft." });
         return;
       }
       draft.muted(() => reset(blank(record)));

@@ -1,5 +1,5 @@
 // Device-local persistence: in-progress entries survive refresh / signal loss, and the shell
-// remembers operator + pond. Storage can throw (private mode, quota, blocked site data), so every
+// remembers the pond. Storage can throw (private mode, quota, blocked site data), so every
 // call is guarded here and failures degrade to "no draft".
 
 /** The seam to storage. Adapters: browserStorage (the app), a Map (scripts/check-draft.ts). */

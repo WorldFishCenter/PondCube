@@ -6,16 +6,16 @@ infrastructure and roadmap decisions; day-to-day coding rules are in
 
 ## The shape of the system
 
-Operators open the app on a phone or tablet, pick who they are and which pond
-they're at, and record one of four kinds of observation. Each record is validated
-on the device, re-validated on the server, and written whole (or not at all) to a
-Postgres database. There are no logins in v1 — a shared site code gates saving.
+Operators sign in on a phone or tablet, pick which pond they're at, and record one
+of four kinds of observation. Each record is validated on the device, re-validated
+on the server, and written whole (or not at all) to a Postgres database. Each
+Operator has their own Clerk account; the server names the Enumerator from it.
 
 ```
 device (phone/tablet)                 server (Vercel, sin1)        data (Neon Postgres, Singapore)
 ─────────────────────                 ─────────────────────        ──────────────────────────────
-pick operator + pond                  server action:               assets        (ponds, static)
-fill a record  ──── draft in ────▶    access check                 operators     (pick-list)
+sign in, pick pond                    server action:               assets        (ponds, static)
+fill a record  ──── draft in ────▶    signed-in operator           operators     (name + email)
   (validated locally)  localStorage   → re-validate (same zod)      wq_readings
                                        → record intake (all/none)   feeding_events
                                                         │           mortality_events
@@ -30,8 +30,8 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 - **`assets`** — one row per Pond. Mirrors the Airtable asset table (see below).
   Carries `legacy_location` + `legacy_tank_id` so converted historical rows map
   onto today's pond codes.
-- **`operators`** — the pick-list of people who record. No auth; a name is attached
-  to each record as its `enumerator`.
+- **`operators`** — the people who record, with the email each signs in with. The
+  signed-in operator's name is attached to each record as its `enumerator`.
 - **`wq_readings`, `feeding_events`, `mortality_events`** — flat event tables.
 - **`sampling_events` + `fish_measurements`** — header/detail: a sampling event owns
   one or more fish measurements (cascade delete). Intake writes them together or
@@ -59,7 +59,7 @@ records never touch production. Schema is applied per branch with
 ### Airtable — the human editing surface for ponds and operators
 
 The Airtable base **PondCube** is where people add and edit ponds (`ponds` table) and
-operators (`operators` table: `name`, `active`, `notes`) by hand. Neon is the system
+operators (`operators` table: `name`, `email`, `active`, `notes`) by hand. Neon is the system
 of record the app reads and writes. The flow is one-way:
 **Airtable → `npm run db:sync` → Neon `assets` / `operators`** (or one table:
 `db:sync-ponds`, `db:sync-operators`). It upserts, so re-run it after edits. Never edit
@@ -83,11 +83,14 @@ database) via `vercel.json`. The optional
 [Neon–Vercel integration](https://neon.tech/docs/guides/vercel) can wire branches
 to environments automatically, including a DB branch per preview deploy.
 
-### Access (v1)
+### Access
 
-No logins. A shared site code (`ACCESS_CODE`) is entered once per device, stored in
-an httpOnly cookie, and checked by every save. Changing it locks out every device
-until re-entered. Set a different code per Vercel environment.
+Each Operator signs in with their own Clerk account (app "PondCube"). A device gets
+in when the account's verified primary email matches an active operator; that
+operator's name becomes the Enumerator of every record saved, whatever the device
+sends. Emails are edited in Airtable (`email` column on `operators`) and synced.
+Anyone can create an account, but one whose email isn't on the list can't record.
+Removing or deactivating an operator locks them out within about a minute.
 
 ## Roadmap / open decisions
 
@@ -96,8 +99,6 @@ until re-entered. Set a different code per Vercel environment.
   for any schema change.
 - **Airtable → Neon sync**: currently run by hand (`npm run db:sync`). A scheduled
   sync is the natural next step once edits happen regularly in Airtable.
-- **Auth**: v1 is deliberately login-free. Per-operator auth is a later decision,
-  not a v1 gap.
 - **Real operators**: the Airtable `operators` table holds two placeholders
   ("Operator 1", "Operator 2"); add the real names and untick the placeholders before
   go-live, then sync.
@@ -118,7 +119,7 @@ fetches components).
 ```bash
 cp .env.example .env
 # paste the DEV pooled connection string into DATABASE_URL
-# set ACCESS_CODE to a long random code
+# Clerk dev keys: `npx clerk@latest link --app app_3KuaeryWjtXBii7NYHMS8o8xhw3 && npx clerk@latest env pull`
 # set AIRTABLE_API_KEY to a token with read access to the PondCube base
 
 npm install
@@ -132,7 +133,9 @@ npm run dev         # http://localhost:3000
 1. Push the repo to GitHub; **Import** it in Vercel.
 2. Set env vars per environment:
    - `DATABASE_URL` — Production → Neon `main` pooled URL; Preview → Neon `dev`.
-   - `ACCESS_CODE` — a different shared code per environment.
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Production → the
+     Clerk production instance (`npx clerk@latest deploy`); Preview → development keys.
+   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`.
 3. Apply the schema to production once:
    ```bash
    DATABASE_URL="<main branch url>" npx drizzle-kit push

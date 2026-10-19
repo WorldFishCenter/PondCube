@@ -21,7 +21,8 @@ row onto exactly one Pond.
 _Avoid_: old code
 
 **Operator**
-A person on site who makes observations; picked from a list, not logged in.
+A person on site who makes observations; signs in with their own account, which is
+matched to them by the email on the operator list.
 _Avoid_: user, staff
 
 **Enumerator**
@@ -29,14 +30,9 @@ The Operator who made a particular Record (the Operator in the recording role).
 _Avoid_: author, creator
 
 **Who & where**
-The Operator and Pond chosen on a device before recording; every Record made there
-carries both. They share the top panel ("Who, where & when") with Recorded-at.
+The signed-in Operator and the Pond chosen on a device before recording; every Record
+made there carries both. They share the top panel ("Who, where & when") with Recorded-at.
 _Avoid_: context, session
-
-**Site code**
-The shared secret that lets a device save Records; entered once per device, and
-changing it locks every device out until re-entered.
-_Avoid_: password, login, PIN
 
 ## Records
 

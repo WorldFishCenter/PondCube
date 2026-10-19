@@ -1,15 +1,15 @@
 "use client";
 
 import * as React from "react";
+import { Show, UserButton } from "@clerk/nextjs";
 import { Info } from "lucide-react";
 import { readLocal, writeLocal } from "@/lib/draft";
 import type { RecordKind } from "@/lib/intake";
 import type { WhoWhere } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -21,8 +21,6 @@ import { FeedingForm } from "./feeding-form";
 import { MortalityForm } from "./mortality-form";
 import { SamplingForm } from "./sampling-form";
 
-// The person recording is the "enumerator" (schema term), labelled "Operator" in the UI.
-const ENUMERATOR_KEY = "pondcube:operator"; // stored value predates the rename; keep it so devices keep their choice
 const POND_KEY = "pondcube:lastPond";
 const RECORDED_AT_KEY = "pondcube:recordedAt"; // kept so a refresh mid-record doesn't lose it
 
@@ -53,8 +51,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
           PondCube Collect
         </h1>
         <div className="flex items-center gap-2">
-          <Badge variant="secondary">Penang HQ</Badge>
           <ThemeToggle />
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </div>
       </header>
       {children}
@@ -73,30 +73,20 @@ export function CollectionSkeleton() {
   );
 }
 
-export function CollectionApp({ operators, ponds }: { operators: { name: string }[]; ponds: Pond[] }) {
-  const [enumerator, setEnumerator] = React.useState("");
+// The person recording is the "enumerator" (schema term): the signed-in Operator, matched on the server.
+export function CollectionApp({ enumerator, ponds }: { enumerator: string; ponds: Pond[] }) {
   const [pondCode, setPondCode] = React.useState("");
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);
-  // Base UI Select: the null item is the placeholder.
-  const operatorItems = [
-    { value: null, label: "Select your name" },
-    ...operators.map((o) => ({ value: o.name, label: o.name })),
-  ];
   const who = { pondCode, enumerator };
 
   // Restore after hydration (server has no localStorage), so setState-in-effect is intended.
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setEnumerator(readLocal(ENUMERATOR_KEY) ?? "");
     setPondCode(readLocal(POND_KEY) ?? "");
     setRecordedAt(readLocal(RECORDED_AT_KEY) ?? "");
     setRestored(true);
   }, []);
-  const chooseEnumerator = (name: string) => {
-    setEnumerator(name);
-    writeLocal(ENUMERATOR_KEY, name);
-  };
   const choosePond = (code: string) => {
     setPondCode(code);
     writeLocal(POND_KEY, code);
@@ -114,27 +104,15 @@ export function CollectionApp({ operators, ponds }: { operators: { name: string 
         <CardHeader>
           <CardTitle>Who, where &amp; when</CardTitle>
           <CardDescription>
-            Operator and pond are remembered on this device. Set the date &amp; time for each record.
+            You&apos;re recording as the signed-in operator. The pond is remembered on this device. Set the date &amp;
+            time for each record.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <FieldGroup className="grid gap-4 md:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="operator">Operator</FieldLabel>
-              <Select items={operatorItems} value={enumerator || null} onValueChange={(v) => chooseEnumerator(v ?? "")}>
-                <SelectTrigger id="operator">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {operatorItems.map((o) => (
-                      <SelectItem key={o.value ?? "none"} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Input id="operator" value={enumerator} readOnly />
             </Field>
             <Field>
               <FieldLabel htmlFor="pond">Pond / tank</FieldLabel>
@@ -152,11 +130,11 @@ export function CollectionApp({ operators, ponds }: { operators: { name: string 
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-96 w-full rounded-xl" />
         </>
-      ) : !(enumerator && pondCode) ? (
+      ) : !pondCode ? (
         <Alert>
           <Info />
-          <AlertTitle>Pick operator and pond</AlertTitle>
-          <AlertDescription>Choose your name and a pond above to start recording.</AlertDescription>
+          <AlertTitle>Pick a pond</AlertTitle>
+          <AlertDescription>Choose a pond above to start recording.</AlertDescription>
         </Alert>
       ) : (
         <Tabs defaultValue={RECORD_KINDS[0].kind}>

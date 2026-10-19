@@ -14,7 +14,8 @@ Read these alongside this file:
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript · shadcn/ui (Base UI) ·
-Tailwind v4 · Drizzle ORM · Neon serverless Postgres · zod · react-hook-form.
+Tailwind v4 · Drizzle ORM · Neon serverless Postgres · zod · react-hook-form ·
+Clerk (one account per Operator).
 Hosted on Vercel (functions pinned to Singapore). Node 20+.
 
 ## Commands
@@ -34,22 +35,23 @@ Run `npm run check`, `npm run typecheck` and `npm run format:check` before commi
 ## Project layout
 
 ```
-app/page.tsx              Access check per request (Suspense), then cached ponds + operators
-app/layout.tsx            Inter font (shadcn preset), viewport, ThemeProvider (light/dark/system)
+app/page.tsx              Signed-in operator check per request (Suspense), then cached ponds
+app/layout.tsx            Inter font (shadcn preset), viewport, ClerkProvider (shadcn theme), ThemeProvider
+app/sign-in, app/sign-up  Clerk's sign-in / sign-up pages; proxy.ts = clerkMiddleware (routes stay public)
 app/globals.css           shadcn theme tokens (incl. --logo-outline) + 44px touch-target rule
 app/icon.svg              Favicon (outline follows OS theme); apple-icon.png = iOS home screen
 components/ui/*            Stock shadcn components (Base UI). Do NOT edit by hand.
 components/theme-provider.tsx, theme-toggle.tsx   shadcn dark mode (next-themes); one-tap light↔dark switch
 components/pondcube-logo.tsx   Logo mark for in-app use (same artwork as app/icon.svg)
-components/collection/*    App UI: shell (who/where/when panel, record kinds → tabs), unlock card, pond picker,
+components/collection/*    App UI: shell (who/where/when panel, record kinds → tabs), not-on-list card, pond picker,
                           the 4 forms; record-form.tsx = shared form hook (draft, save) + fields
 lib/schema.ts             Drizzle tables — the single source of truth for the data model
 lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules
 lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing
-lib/data.ts               Server-only cached reads (ponds, operators)
-lib/actions.ts            Server actions: unlock + saveRecord(kind, input)
-lib/access.ts             Shared site-code check (httpOnly cookie, server-only)
-lib/draft.ts              Drafts per record kind + pond; remembered operator/pond (storage injected)
+lib/data.ts               Server-only cached reads (ponds, operator by email)
+lib/actions.ts            Server action: saveRecord(kind, input); Enumerator = signed-in operator
+lib/access.ts             Signed-in operator: Clerk account's verified email → active operator (server-only)
+lib/draft.ts              Drafts per record kind + pond; remembered pond (storage injected)
 lib/db.ts                 Neon HTTP + Drizzle client (server-only)
 lib/options.ts            Choice lists (periods, feed types, causes)
 scripts/sync-airtable.ts  Airtable (PondCube base: ponds, operators) → Neon assets/operators
@@ -116,7 +118,7 @@ These favour care over speed; on trivial tasks, use judgment.
   observation's true instant is preserved regardless of server timezone.
 - **Server-only boundaries.** `lib/db.ts`, `lib/data.ts`, `lib/access.ts` and the
   server actions are server-only. Never import them into client components or leak
-  `DATABASE_URL`/`ACCESS_CODE` to the client.
+  `DATABASE_URL`/`CLERK_SECRET_KEY` to the client.
 - **Everything keys on `pond_code`.** It's the join across assets, every event
   table, legacy history, and (later) sensor data.
 
@@ -126,6 +128,7 @@ One Neon Postgres database in Singapore holds all records. Two branches:
 `main` = production, `dev` = development (same schema, isolated data); the app just
 reads `DATABASE_URL`. Airtable is the human editing surface for the pond list and is
 synced one-way into Neon (`npm run db:sync`) — don't treat Neon as the pond editor.
-Operators are edited there too (`active` unticked = hidden from the pick-list).
+Operators are edited there too, with the `email` they sign in with (`active` unticked
+= can't sign in).
 Sensor (Mandible) data will land in the same database later, joined on
 `pond_code` + timestamp. Full detail and setup/deploy steps: `docs/architecture.md`.

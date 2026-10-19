@@ -1,20 +1,29 @@
 import { Suspense } from "react";
-import { hasAccess } from "@/lib/access";
-import { getOperators, getPonds } from "@/lib/data";
+import { SignIn } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
+import { signedInOperator } from "@/lib/access";
+import { getPonds } from "@/lib/data";
 import { CollectionApp, CollectionSkeleton, Shell } from "@/components/collection/collection-app";
-import { UnlockCard } from "@/components/collection/unlock-card";
+import { NotOnListCard } from "@/components/collection/not-on-list-card";
 
-// The access check reads a cookie, so it runs per request inside Suspense; the data reads are
-// cached, so unlocked devices still skip Neon.
+// The access check reads the session, so it runs per request inside Suspense; the data reads are
+// cached, so signed-in devices still skip Neon.
 async function App() {
-  if (!(await hasAccess()))
+  if (!(await auth()).userId)
     return (
       <Shell>
-        <UnlockCard />
+        {/* Hash routing keeps every sign-in step on this page. */}
+        <SignIn routing="hash" appearance={{ elements: { rootBox: "w-full", cardBox: "w-full max-w-none" } }} />
       </Shell>
     );
-  const [operators, ponds] = await Promise.all([getOperators(), getPonds()]);
-  return <CollectionApp operators={operators} ponds={ponds} />;
+  const enumerator = await signedInOperator();
+  if (!enumerator)
+    return (
+      <Shell>
+        <NotOnListCard />
+      </Shell>
+    );
+  return <CollectionApp enumerator={enumerator} ponds={await getPonds()} />;
 }
 
 export default function Page() {
