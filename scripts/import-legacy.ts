@@ -14,7 +14,7 @@ import { neonTarget, type SyncTarget } from "./sync-airtable";
 //
 // Decided 2026-10-20 (the log has no times or names):
 // - Recorded-at: morning = 08:00, afternoon = 14:00, Penang time.
-// - Enumerator: Mahirah Mahmuddin.
+// - Enumerator: Mahirah Mahmuddin. App version: "legacy" (app records carry the version that saved them).
 // - Readings missing dissolved oxygen and/or temperature are kept with blanks; Ranges still apply.
 // - The two values in OUT_OF_RANGE_KEPT are kept as recorded; any other out-of-range value stops the import.
 const ENUMERATOR = "Mahirah Mahmuddin";
@@ -82,6 +82,7 @@ export async function prepareImport(
       recordedAt: new Date(`${r.date}T${TIME[r.period as keyof typeof TIME]}:00+08:00`),
       period: r.period,
       enumerator: ENUMERATOR,
+      appVersion: "legacy",
       remarks: r.remarks || null,
     };
     for (const [column, field] of Object.entries(VALUES)) {

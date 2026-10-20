@@ -33,6 +33,9 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 - **`operators`** — the people who record, with the email each signs in with. The
   signed-in operator's name is attached to each record as its `enumerator`.
 - **`wq_readings`, `feeding_events`, `mortality_events`** — flat event tables.
+- **`app_version`** on every record table (fish measurements inherit it from their sampling
+  event): the app version that saved it, set on the server by record intake, or `legacy` for the
+  imported Excel log. Use it to trace records to the code and rules that accepted them.
 - **`sampling_events` + `fish_measurements`** — header/detail: a sampling event owns
   one or more fish measurements (cascade delete). Intake writes them together or
   not at all.

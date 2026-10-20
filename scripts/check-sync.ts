@@ -96,6 +96,7 @@ async function main() {
     recordedAt: new Date(),
     mortalityCount: 1,
     enumerator: "Ben",
+    appVersion: "9.9.9",
   });
   const second = await prepared({ ponds: [pond("PEN-FT1-001")], operators: [{ name: "Ana", active: true }] });
   assert.match(second.summary[0], /1 retired \(PEN-FT1-002\)/);

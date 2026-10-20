@@ -6,7 +6,7 @@ import { wqReadings, feedingEvents, mortalityEvents, samplingEvents, fishMeasure
 import { RECORD_KINDS, samplingSchema, type RecordKind } from "./validation";
 
 // Record intake: validate a record of a given kind and persist it, all-or-nothing.
-//   createRecordIntake(write).save(kind, input, enumerator)
+//   createRecordIntake(write, appVersion).save(kind, input, enumerator)
 // Throws a ZodError for invalid input (nothing written) and rejects on unknown kinds.
 // Callers own access checks and name the Enumerator; intake owns kind → table, validation, and atomic writes.
 
@@ -31,25 +31,26 @@ for (const [kind, table] of Object.entries(TABLES)) {
   if (stray.length) throw new Error(`Record intake: ${kind} fields with no ${kind} column: ${stray.join(", ")}`);
 }
 
-export function createRecordIntake(write: AtomicWriter) {
+/** `appVersion` is the server's version, stamped on every record so it can be traced to the code that saved it. */
+export function createRecordIntake(write: AtomicWriter, appVersion: string) {
   return {
     /** `input` is what the device sent (untrusted); `enumerator` is the signed-in Operator and wins over it. */
     async save(kind: RecordKind, input: unknown, enumerator: string): Promise<void> {
       if (!Object.hasOwn(RECORD_KINDS, kind)) throw new Error(`Unknown record kind: ${String(kind)}`);
       const record = { ...(input as object), enumerator };
-      if (kind === "sampling") return write(samplingInserts(samplingSchema.parse(record)));
-      return write([{ table: TABLES[kind], rows: [RECORD_KINDS[kind].save.parse(record)] }]);
+      if (kind === "sampling") return write(samplingInserts(samplingSchema.parse(record), appVersion));
+      return write([{ table: TABLES[kind], rows: [{ ...RECORD_KINDS[kind].save.parse(record), appVersion }] }]);
     },
   };
 }
 
 // A sampling event and its fish measurements: the id is made here so both go in one write.
-function samplingInserts({ fish, ...event }: z.output<typeof samplingSchema>): Insert[] {
+function samplingInserts({ fish, ...event }: z.output<typeof samplingSchema>, appVersion: string): Insert[] {
   const id = crypto.randomUUID();
   const measured: (typeof fishMeasurements.$inferInsert)[] = fish
     .filter((f) => f.weightG !== undefined || f.lengthCm !== undefined) // schema guarantees ≥ 1
     .map((f) => ({ samplingEventId: id, weightG: f.weightG, lengthCm: f.lengthCm }));
-  const eventRow: typeof samplingEvents.$inferInsert = { ...event, id };
+  const eventRow: typeof samplingEvents.$inferInsert = { ...event, id, appVersion };
   return [
     { table: samplingEvents, rows: [eventRow] },
     { table: fishMeasurements, rows: measured },

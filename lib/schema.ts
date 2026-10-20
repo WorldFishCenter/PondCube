@@ -50,6 +50,7 @@ export const wqReadings = pgTable("wq_readings", {
   nitrate: doublePrecision("nitrate"),
   remarks: text("remarks"),
   enumerator: text("enumerator").notNull(),
+  appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -66,6 +67,7 @@ export const feedingEvents = pgTable("feeding_events", {
   feedingsCount: integer("feedings_count"),
   remarks: text("remarks"),
   enumerator: text("enumerator").notNull(),
+  appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -80,6 +82,7 @@ export const mortalityEvents = pgTable("mortality_events", {
   suspectedCause: text("suspected_cause"),
   remarks: text("remarks"),
   enumerator: text("enumerator").notNull(),
+  appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -92,6 +95,7 @@ export const samplingEvents = pgTable("sampling_events", {
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
   notes: text("notes"),
   enumerator: text("enumerator").notNull(),
+  appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

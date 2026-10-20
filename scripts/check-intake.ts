@@ -22,7 +22,7 @@ async function main() {
     db.transaction(async (tx) => {
       for (const { table, rows } of inserts) await tx.insert(table).values(rows);
     });
-  const intake = createRecordIntake(pgliteWriter);
+  const intake = createRecordIntake(pgliteWriter, "9.9.9"); // the server's app version
   const save = (kind: RecordKind, input: object) => intake.save(kind, input, "Operator 1"); // the signed-in Operator
 
   await db.insert(schema.assets).values({
@@ -53,6 +53,7 @@ async function main() {
   assert.equal(wq.dissolvedOxygen, 6.5);
   assert.equal(wq.ph, null);
   assert.equal(wq.recordedAt.toISOString(), recordedAt.toISOString(), "recorded-at keeps its instant");
+  assert.equal(wq.appVersion, "9.9.9", "stamped with the server's app version");
   await save("feeding", { ...who, recordedAt, feedType: "pellet", feedAmountKg: "3.5", feedingsCount: "2" });
   await save("mortality", { ...who, recordedAt, mortalityCount: "3", suspectedCause: "water_quality" });
   assert.equal(await rows(schema.feedingEvents), 1);
@@ -71,6 +72,7 @@ async function main() {
     .from(schema.fishMeasurements)
     .where(eq(schema.fishMeasurements.samplingEventId, event.id));
   assert.equal(fish.length, 2);
+  assert.equal(event.appVersion, "9.9.9");
 
   // Invalid input writes nothing: ranges, whole numbers, offset-less time, unknown kind.
   await assert.rejects(save("wq", { ...who, recordedAt, period: "morning", dissolvedOxygen: "25", temperature: "28" }));

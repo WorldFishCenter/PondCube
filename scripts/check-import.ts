@@ -76,6 +76,7 @@ async function main() {
   const ft1 = await byPond("PEN-FT1-001");
   assert.equal(ft1.recordedAt.toISOString(), "2025-07-02T06:00:00.000Z", "afternoon = 14:00 Penang time");
   assert.equal(ft1.enumerator, "Mahirah Mahmuddin");
+  assert.equal(ft1.appVersion, "legacy");
   const aqua = await byPond("PEN-AQU-003");
   assert.equal(aqua.recordedAt.toISOString(), "2025-07-10T00:00:00.000Z", "morning = 08:00 Penang time");
   assert.equal(aqua.dissolvedOxygen, null, "a blank stays blank, never 0");
