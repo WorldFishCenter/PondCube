@@ -2,21 +2,21 @@
 
 import { useFieldArray } from "react-hook-form";
 import { Plus, Trash2 } from "lucide-react";
-import { samplingForm, type WhoWhere } from "@/lib/validation";
+import { samplingForm } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { FieldDescription, FieldError, FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field";
-import { NotesField, NumberField, RecordCard, type RecordedAt, useRecordForm } from "./record-form";
+import { NotesField, NumberField, RecordCard, type RecordFormProps, useRecordForm } from "./record-form";
 
 const NO_FISH = { weightG: "", lengthCm: "" };
 const blank = () => ({ notes: "", fish: [NO_FISH] });
 
-export function SamplingForm({ who, recordedAt }: { who: WhoWhere; recordedAt: RecordedAt }) {
+export function SamplingForm({ pondCode, recordedAt }: RecordFormProps) {
   const { form, card } = useRecordForm({
     kind: "sampling",
     schema: samplingForm,
     blank,
     savedMessage: (record) => `Sampling event saved (${record.fish.length} fish).`,
-    who,
+    pondCode,
     recordedAt,
   });
   const {

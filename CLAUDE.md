@@ -20,15 +20,15 @@ Hosted on Vercel (functions pinned to Singapore). Node 20+.
 
 ## Commands
 
-| Command                                       | Does                                                                                                                            |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev` / `build` / `start`             | Next.js                                                                                                                         |
-| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                   |
-| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                         |
-| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, record intake, Airtable sync — against in-memory Postgres (PGLite, no network) |
-| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                        |
-| `npm run db:sync`                             | Check, then copy ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`        |
-| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                            |
+| Command                                       | Does                                                                                                                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev` / `build` / `start`             | Next.js                                                                                                                                          |
+| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                                    |
+| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                          |
+| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, record intake, Airtable sync, operator access — against in-memory Postgres (PGLite, no network) |
+| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                         |
+| `npm run db:sync`                             | Check, then copy ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                         |
+| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                                             |
 
 Run `npm run check`, `npm run typecheck` and `npm run format:check` before committing.
 
@@ -47,16 +47,18 @@ components/ui/*            Stock shadcn components (Base UI). Do NOT edit by han
 components/theme-provider.tsx, theme-toggle.tsx   shadcn dark mode (next-themes); one-tap light↔dark switch
 components/pondcube-logo.tsx   Logo mark for in-app use (same artwork as app/icon.svg)
 components/collection/*    App UI: shell (who/where/when panel, record kinds → tabs), not-on-list card, pond picker,
-                          the 4 forms; record-form.tsx = shared form hook (draft, save) + fields
+                          the 4 forms, feedback sheet (Airtable form); record-form.tsx = shared form hook (draft, save) + fields
 lib/schema.ts             Drizzle tables — the single source of truth for the data model
-lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules
-lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing
+lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules; RECORD_KINDS
+lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing; the caller names the Enumerator
 lib/data.ts               Server-only cached reads (ponds, operator by email)
 lib/actions.ts            Server action: saveRecord(kind, input); Enumerator = signed-in operator
-lib/access.ts             Signed-in operator: Clerk account's verified email → active operator (server-only)
-lib/draft.ts              Drafts per record kind + pond; remembered pond (storage injected)
+lib/access.ts             Signed-in access: wires Clerk into lib/operators.ts (server-only)
+lib/operators.ts          Operator access: account → signed out / not on the list / Operator; email normaliser (shared with sync)
+lib/draft.ts              Draft per record kind + pond: restore, change, submit (only a save clears it; storage + save injected); remembered pond
 lib/db.ts                 Neon HTTP + Drizzle client (server-only)
 lib/options.ts            Choice lists (periods, feed types, causes)
+lib/version.ts            App version from package.json (server-only: footer, feedback form)
 scripts/sync-airtable.ts  Airtable (PondCube base: ponds, operators) → Neon assets/operators
 scripts/check-*.ts        The self-checks run by `npm run check`
 ```

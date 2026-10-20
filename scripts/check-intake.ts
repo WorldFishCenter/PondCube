@@ -8,6 +8,7 @@ import type { PgTable } from "drizzle-orm/pg-core";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import * as schema from "../lib/schema";
 import { createRecordIntake, type AtomicWriter } from "../lib/intake";
+import type { RecordKind } from "../lib/validation";
 
 async function main() {
   const client = new PGlite();
@@ -22,6 +23,7 @@ async function main() {
       for (const { table, rows } of inserts) await tx.insert(table).values(rows);
     });
   const intake = createRecordIntake(pgliteWriter);
+  const save = (kind: RecordKind, input: object) => intake.save(kind, input, "Operator 1"); // the signed-in Operator
 
   await db.insert(schema.assets).values({
     pondCode: "PEN-FT1-001",
@@ -33,12 +35,12 @@ async function main() {
     zone: "Fish Tank 1",
     unitType: "tank",
   });
-  const who = { pondCode: "PEN-FT1-001", enumerator: "Operator 1" };
+  const who = { pondCode: "PEN-FT1-001" };
   const recordedAt = new Date("2026-10-09T00:30:00.000Z");
   const rows = async (table: PgTable) => (await db.select({ n: count() }).from(table))[0].n;
 
   // Each kind round-trips through one interface.
-  await intake.save("wq", {
+  await save("wq", {
     ...who,
     recordedAt,
     period: "morning",
@@ -51,13 +53,13 @@ async function main() {
   assert.equal(wq.dissolvedOxygen, 6.5);
   assert.equal(wq.ph, null);
   assert.equal(wq.recordedAt.toISOString(), recordedAt.toISOString(), "recorded-at keeps its instant");
-  await intake.save("feeding", { ...who, recordedAt, feedType: "pellet", feedAmountKg: "3.5", feedingsCount: "2" });
-  await intake.save("mortality", { ...who, recordedAt, mortalityCount: "3", suspectedCause: "water_quality" });
+  await save("feeding", { ...who, recordedAt, feedType: "pellet", feedAmountKg: "3.5", feedingsCount: "2" });
+  await save("mortality", { ...who, recordedAt, mortalityCount: "3", suspectedCause: "water_quality" });
   assert.equal(await rows(schema.feedingEvents), 1);
   assert.equal((await db.select().from(schema.mortalityEvents))[0].suspectedCause, "water_quality");
 
   // Sampling: event + measured fish in one write; blank rows are skipped.
-  await intake.save("sampling", {
+  await save("sampling", {
     ...who,
     recordedAt,
     notes: "batch 7",
@@ -71,24 +73,26 @@ async function main() {
   assert.equal(fish.length, 2);
 
   // Invalid input writes nothing: ranges, whole numbers, offset-less time, unknown kind.
-  await assert.rejects(
-    intake.save("wq", { ...who, recordedAt, period: "morning", dissolvedOxygen: "25", temperature: "28" }),
-  );
-  await assert.rejects(intake.save("mortality", { ...who, recordedAt, mortalityCount: "2.5" }));
-  await assert.rejects(intake.save("mortality", { ...who, recordedAt: "2026-10-09T08:00", mortalityCount: "1" }));
-  await assert.rejects(intake.save("sampling", { ...who, recordedAt, fish: [{ weightG: "", lengthCm: "" }] }));
-  await assert.rejects(intake.save("bogus" as "wq", { ...who, recordedAt } as never)); // deliberately ill-typed
+  await assert.rejects(save("wq", { ...who, recordedAt, period: "morning", dissolvedOxygen: "25", temperature: "28" }));
+  await assert.rejects(save("mortality", { ...who, recordedAt, mortalityCount: "2.5" }));
+  await assert.rejects(save("mortality", { ...who, recordedAt: "2026-10-09T08:00", mortalityCount: "1" }));
+  await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ weightG: "", lengthCm: "" }] }));
+  await assert.rejects(save("bogus" as RecordKind, { ...who, recordedAt })); // deliberately ill-typed
   assert.equal(await rows(schema.wqReadings), 1);
   assert.equal(await rows(schema.mortalityEvents), 1);
 
   // Unknown pond: the foreign key rejects it.
-  await assert.rejects(intake.save("mortality", { ...who, pondCode: "PEN-NOPE-999", recordedAt, mortalityCount: "1" }));
+  await assert.rejects(save("mortality", { ...who, pondCode: "PEN-NOPE-999", recordedAt, mortalityCount: "1" }));
 
   // Atomic: if the fish insert fails, the sampling event is not kept either.
   await client.exec("ALTER TABLE fish_measurements RENAME TO fish_measurements_off");
-  await assert.rejects(intake.save("sampling", { ...who, recordedAt, fish: [{ weightG: "50" }] }));
+  await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ weightG: "50" }] }));
   await client.exec("ALTER TABLE fish_measurements_off RENAME TO fish_measurements");
   assert.equal(await rows(schema.samplingEvents), 1, "no orphan sampling event");
+
+  // The Enumerator is the caller's (the signed-in Operator), whatever the device sends.
+  await save("feeding", { ...who, recordedAt, feedAmountKg: "1", enumerator: "Someone else" });
+  assert.ok((await db.select().from(schema.feedingEvents)).every((f) => f.enumerator === "Operator 1"));
 
   // (Field names vs columns are checked when lib/intake.ts loads: reaching this line means they match.)
   await client.close();

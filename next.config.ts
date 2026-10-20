@@ -4,8 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
-  // From the Next.js PWA guide: baseline security headers, and the service worker always revalidated
-  // and limited to this origin.
+  // Next.js PWA guide: security headers on every page; sw.js always revalidated and same-origin only.
   async headers() {
     return [
       {

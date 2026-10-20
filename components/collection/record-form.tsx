@@ -7,14 +7,21 @@ import type { z } from "zod";
 import { format, parse } from "date-fns";
 import { AlertCircle, CheckCircle2, ChevronDownIcon } from "lucide-react";
 import { saveRecord } from "@/lib/actions";
-import { createDraft, draftKey } from "@/lib/draft";
-import type { RecordInput, RecordKind } from "@/lib/intake";
-import { recordedAtLocal, type WhoWhere } from "@/lib/validation";
+import { createDraft, draftKey, type Submitted } from "@/lib/draft";
+import type { RECORD_KINDS, RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSet,
+  FieldTitle,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
@@ -27,67 +34,60 @@ type Message = { message?: string } | undefined;
 
 /** Recorded-at, held by the app shell for every record kind: local "YYYY-MM-DDTHH:mm", "" until set. */
 export type RecordedAt = { value: string; clear: () => void };
+/** What every record form gets from the app shell. */
+export type RecordFormProps = { pondCode: string; recordedAt: RecordedAt };
 
-// Shared lifecycle of the record forms: this pond's draft, validate on the device, save with
-// who/where and recorded-at, reset (recorded-at too, so the next record needs its own). `blank` must be module-level (stable): it seeds every load and reset.
+const NOT_SAVED: Record<Exclude<Submitted, "saved">, string> = {
+  noRecordedAt: "Set the date & time at the top before saving.",
+  locked: "Sign in again. Your entry is kept as a draft.",
+  failed: "Could not save. Your entry is kept as a draft; check your connection and try again.",
+};
+
+// Binds a record form to this pond's Draft (lib/draft.ts): restore it, keep every edit, submit; once
+// saved, start the next record (recorded-at too, so it needs its own). `blank` must be module-level (stable).
 export function useRecordForm<K extends RecordKind, TValues extends FieldValues, TRecord extends object>({
   kind,
   schema,
   blank,
   savedMessage,
-  who,
+  pondCode,
   recordedAt,
-}: {
+}: RecordFormProps & {
   kind: K;
-  schema: z.ZodType<TRecord, TValues>; // the kind's form schema
+  schema: z.ZodType<TRecord, TValues> & (typeof RECORD_KINDS)[K]["form"]; // must be this kind's form schema
   blank: (last?: TRecord) => TValues; // empty number fields are "": reset() with undefined leaves inputs filled
   savedMessage: (record: TRecord) => string;
-  who: WhoWhere;
-  recordedAt: RecordedAt;
 }) {
   const [result, setResult] = React.useState<Result>(null);
   const form = useForm<TValues, unknown, TRecord>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver<TValues, unknown, TRecord>(schema),
     defaultValues: blank() as DefaultValues<TValues>,
   });
   const { reset, watch, handleSubmit, formState } = form;
-  const draft = React.useMemo(() => createDraft<TValues>(draftKey(kind, who.pondCode)), [kind, who.pondCode]);
+  const draft = React.useMemo(
+    () => createDraft<TValues>(draftKey(kind, pondCode), (record) => saveRecord(kind, { ...record, pondCode })),
+    [kind, pondCode],
+  );
 
   // Show this pond's draft on mount (tabs unmount inactive forms; the shell remounts forms per pond).
   React.useEffect(() => {
-    draft.muted(() => reset({ ...blank(), ...draft.load() } as TValues));
+    draft.muted(() => reset({ ...blank(), ...draft.restore() } as TValues));
   }, [draft, reset, blank]);
   React.useEffect(() => {
-    const sub = watch((values) => draft.save(values));
+    const sub = watch((values) => draft.change(values));
     return () => sub.unsubscribe();
   }, [draft, watch]);
 
   const onSubmit = handleSubmit(async (record) => {
     setResult(null);
-    const at = recordedAtLocal.safeParse(recordedAt.value);
-    if (!at.success) {
-      setResult({ ok: false, msg: "Set the date & time at the top before saving." });
+    const outcome = await draft.submit(record, recordedAt.value);
+    if (outcome !== "saved") {
+      setResult({ ok: false, msg: NOT_SAVED[outcome] });
       return;
     }
-    try {
-      // The form schema plus who/where and the instant is the kind's save input; intake re-validates.
-      const outcome = await saveRecord(kind, { ...record, ...who, recordedAt: at.data } as RecordInput<K>);
-      if (outcome === "locked") {
-        setResult({ ok: false, msg: "Sign in again. Your entry is kept as a draft." });
-        return;
-      }
-      draft.muted(() => reset(blank(record)));
-      draft.clear();
-      recordedAt.clear();
-      setResult({ ok: true, msg: savedMessage(record) });
-    } catch (err) {
-      // Server errors are masked in production; the cause goes to the console.
-      console.error(err);
-      setResult({
-        ok: false,
-        msg: "Could not save. Your entry is kept as a draft; check your connection and try again.",
-      });
-    }
+    draft.muted(() => reset(blank(record)));
+    recordedAt.clear();
+    setResult({ ok: true, msg: savedMessage(record) });
   });
 
   return { form, card: { onSubmit, result, pending: formState.isSubmitting } };
@@ -121,7 +121,10 @@ export function RecordCard({
       <CardContent>
         {/* noValidate: zod shows every error in the same place instead of native browser bubbles. */}
         <form id={id} noValidate onSubmit={onSubmit}>
-          <FieldGroup>{children}</FieldGroup>
+          {/* Locked while saving: an edit made now would be wiped when the next record starts. */}
+          <FieldSet disabled={pending}>
+            <FieldGroup>{children}</FieldGroup>
+          </FieldSet>
         </form>
       </CardContent>
       <CardFooter className="flex-col gap-4">

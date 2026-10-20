@@ -50,16 +50,14 @@ const recordedAtInstant = z
   })
   .pipe(z.coerce.date());
 
-// Who recorded and where: picked once in the app shell, attached to every record on submit.
-const whoWhere = z.object({
-  pondCode: z.string().min(1, "Select a pond"),
-  enumerator: z.string().min(1, "Select the operator"),
-});
-export type WhoWhere = z.infer<typeof whoWhere>;
-
 // Each record type has a form schema (what the operator fills in, checked on the device) and a
 // save schema (form + who/where + recorded-at instant, re-checked by record intake before insert).
-const forSave = { ...whoWhere.shape, recordedAt: recordedAtInstant };
+// Where is the Pond picked in the app shell; who is the Enumerator, added on the server.
+const forSave = {
+  pondCode: z.string().min(1, "Select a pond"),
+  enumerator: z.string().min(1),
+  recordedAt: recordedAtInstant,
+};
 
 export const waterQualityForm = z.object({
   period: enumOf(PERIODS, "Select time of day"),
@@ -99,3 +97,12 @@ export const samplingForm = z.object({
     ),
 });
 export const samplingSchema = samplingForm.extend(forSave);
+
+/** The Record kinds. Record intake adds each one's table and the app each one's tab, checked complete by the compiler. */
+export const RECORD_KINDS = {
+  wq: { form: waterQualityForm, save: waterQualitySchema },
+  feeding: { form: feedingForm, save: feedingSchema },
+  mortality: { form: mortalityForm, save: mortalitySchema },
+  sampling: { form: samplingForm, save: samplingSchema },
+} as const;
+export type RecordKind = keyof typeof RECORD_KINDS;

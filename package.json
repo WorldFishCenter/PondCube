@@ -1,6 +1,6 @@
 {
   "name": "pondcube-app",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "tsx scripts/check-validation.ts && tsx scripts/check-draft.ts && tsx scripts/check-intake.ts && tsx scripts/check-sync.ts",
+    "check": "tsx scripts/check-validation.ts && tsx scripts/check-draft.ts && tsx scripts/check-intake.ts && tsx scripts/check-sync.ts && tsx scripts/check-access.ts",
     "db:push": "drizzle-kit push",
     "db:sync": "tsx scripts/sync-airtable.ts",
     "db:sync-ponds": "tsx scripts/sync-airtable.ts ponds",

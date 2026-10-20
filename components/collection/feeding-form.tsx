@@ -1,21 +1,21 @@
 "use client";
 
 import { Controller } from "react-hook-form";
-import { feedingForm, type WhoWhere } from "@/lib/validation";
+import { feedingForm } from "@/lib/validation";
 import { FEED_TYPES } from "@/lib/options";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { ChoiceField, NotesField, NumberField, RecordCard, type RecordedAt, useRecordForm } from "./record-form";
+import { ChoiceField, NotesField, NumberField, RecordCard, type RecordFormProps, useRecordForm } from "./record-form";
 
 const blank = () => ({ feedType: undefined, feedTypeOther: "", feedAmountKg: "", feedingsCount: "", remarks: "" });
 
-export function FeedingForm({ who, recordedAt }: { who: WhoWhere; recordedAt: RecordedAt }) {
+export function FeedingForm({ pondCode, recordedAt }: RecordFormProps) {
   const { form, card } = useRecordForm({
     kind: "feeding",
     schema: feedingForm,
     blank,
     savedMessage: () => "Feeding event saved.",
-    who,
+    pondCode,
     recordedAt,
   });
   const {

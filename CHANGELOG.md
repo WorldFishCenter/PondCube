@@ -4,12 +4,23 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.4.0] - 2026-10-20
+
+### Added
+
+- A "Send feedback" link at the bottom of the app opens a short form to tell the team about problems, missing things or ideas, without leaving the app. Your name is filled in for you.
+
+### Fixed
+
+- Renaming an operator in Airtable, or giving their email address to someone else, no longer stops ponds and operators from being copied into the app.
+- While a record is saving, its form is locked, so nothing you type in the meantime gets lost.
+
 ## [0.3.0] - 2026-10-19
 
 ### Added
 
 - The app can be installed on a phone or tablet: use "Add to Home screen" (or "Install app") in the browser. It then opens full-screen with its own PondCube icon.
-- Once installed, the app also opens without signal, so you can start a record at the pond. Saving still needs signal; until then the record is kept on the device as a draft.
+- Once installed, the app also opens without signal, so you can start a record at the pond. Open it once with signal after installing so it can be kept on the device. Saving still needs signal; until then the record is kept on the device as a draft.
 
 ## [0.2.0] - 2026-10-19
 

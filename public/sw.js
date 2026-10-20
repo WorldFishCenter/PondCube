@@ -1,7 +1,5 @@
-// Lets the installed app open with no signal: the last page that loaded, plus its build files.
-// Saving still needs signal; a save made offline fails and its draft stays on the device.
-// Registered by components/service-worker.tsx. Bump CACHE to drop everything kept so far.
-const CACHE = "pondcube-v1";
+// Keeps the last page and its build files so the installed app opens with no signal (docs/architecture.md).
+const CACHE = "pondcube-v1"; // bump to drop everything kept so far
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -21,9 +19,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  // Pages: network first, so with signal the page (and who is signed in) is always current.
-  // ponytail: the last page stays on the device after sign-out until the next load with signal;
-  // saves are still checked against whoever is signed in.
+  // Pages: network first, so with signal the page is always current; offline, the last one loaded.
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -36,9 +32,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Build files are content-hashed and served immutable, so cache first. Dev builds aren't immutable,
-  // so `next dev` never gets stale files.
-  // ponytail: old deploys' files pile up until CACHE is bumped; prune them if storage ever matters.
+  // Build files: cache first, keeping only those served immutable (never `next dev`'s).
   if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       caches.match(request).then(

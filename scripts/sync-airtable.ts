@@ -1,10 +1,11 @@
 import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
-import { and, eq, getTableColumns, ne, notInArray, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, isNotNull, ne, notInArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { drizzle } from "drizzle-orm/neon-http";
 import type { PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { normaliseEmail } from "../lib/operators";
 import { assets, operators } from "../lib/schema";
 
 // Airtable is where people edit ponds and operators; this copies both one way into Neon.
@@ -17,7 +18,27 @@ type Fields = Record<string, unknown>;
 export type AirtableRows = { ponds?: Fields[]; operators?: Fields[] };
 type Pond = typeof assets.$inferInsert;
 type Operator = typeof operators.$inferInsert;
-export type SyncPlan = { ponds?: Pond[]; operators?: Operator[] };
+type SyncPlan = { ponds?: Pond[]; operators?: Operator[] };
+type Db = PgDatabase<PgQueryResultHKT>;
+
+/** The seam to the database: reads, plus one all-or-nothing write. Adapters: Neon batch (main), PGLite transaction (check-sync). */
+export type SyncTarget = { db: Db; writeAll: (build: (db: Db) => BatchItem<"pg">[]) => Promise<unknown> };
+
+/**
+ * Checks every Airtable row. Any problem means nothing can be written; otherwise returns what will
+ * change and the write that applies all of it, all-or-nothing.
+ */
+export async function prepareSync(
+  rows: AirtableRows,
+  target: SyncTarget,
+): Promise<{ problems: string[] } | { summary: string[]; write: () => Promise<unknown> }> {
+  const { plan, problems } = planSync(rows);
+  if (problems.length) return { problems };
+  return {
+    summary: await describeSync(target.db, plan),
+    write: () => target.writeAll((db) => syncQueries(db, plan)),
+  };
+}
 
 // Airtable enforces neither types nor uniqueness, so every cell is checked here.
 const text = z.preprocess((v) => (v == null ? "" : String(v).trim()), z.string());
@@ -75,7 +96,7 @@ const pondRow = z
   }));
 
 const email = text
-  .transform((s) => s.toLowerCase() || null)
+  .transform((s) => normaliseEmail(s) || null)
   .pipe(z.email({ error: "is not an email address" }).nullable());
 const operatorRow = z.object({
   name: required,
@@ -83,8 +104,7 @@ const operatorRow = z.object({
   active: z.boolean({ error: "should be a checkbox" }).default(false), // unticked = omitted
 });
 
-/** Checks every Airtable row; any problem means nothing should be written. */
-export function planSync(rows: AirtableRows): { plan: SyncPlan; problems: string[] } {
+function planSync(rows: AirtableRows): { plan: SyncPlan; problems: string[] } {
   const problems: string[] = [];
   const plan: SyncPlan = {};
   if (rows.ponds) {
@@ -134,10 +154,7 @@ function checkRows<T>(
   return ok;
 }
 
-type Db = PgDatabase<PgQueryResultHKT>;
-
-/** What a sync would change, for the log before writing. */
-export async function describeSync(db: Db, plan: SyncPlan): Promise<string[]> {
+async function describeSync(db: Db, plan: SyncPlan): Promise<string[]> {
   const lines: string[] = [];
   if (plan.ponds) {
     const existing = await db.select({ code: assets.pondCode, status: assets.status }).from(assets);
@@ -163,8 +180,7 @@ export async function describeSync(db: Db, plan: SyncPlan): Promise<string[]> {
   return lines;
 }
 
-/** The plan's writes; run them all-or-nothing (Neon batch in main, a transaction in check-sync). */
-export function syncQueries(db: Db, plan: SyncPlan): BatchItem<"pg">[] {
+function syncQueries(db: Db, plan: SyncPlan): BatchItem<"pg">[] {
   const queries: BatchItem<"pg">[] = [];
   if (plan.ponds) {
     const codes = plan.ponds.map((p) => p.pondCode);
@@ -183,6 +199,8 @@ export function syncQueries(db: Db, plan: SyncPlan): BatchItem<"pg">[] {
   if (plan.operators) {
     const names = plan.operators.map((o) => o.name);
     queries.push(
+      // Emails move between operators (a rename, a hand-over): free them all; the upsert sets them again.
+      db.update(operators).set({ email: null }).where(isNotNull(operators.email)),
       db
         .insert(operators)
         .values(plan.operators)
@@ -240,14 +258,21 @@ async function main() {
     only === "operators" ? undefined : fetchTable("ponds"),
     only === "ponds" ? undefined : fetchTable("operators"),
   ]);
-  const { plan, problems } = planSync({ ponds, operators: ops });
-  if (problems.length)
-    throw new Error(`Nothing written. Fix these in Airtable, then re-run:\n- ${problems.join("\n- ")}`);
-
   const db = drizzle(neon(url));
-  console.log((await describeSync(db, plan)).join("\n"));
-  const [first, ...rest] = syncQueries(db, plan);
-  await db.batch([first, ...rest]);
+  const sync = await prepareSync(
+    { ponds, operators: ops },
+    {
+      db,
+      writeAll: (build) => {
+        const [first, ...rest] = build(db);
+        return db.batch([first, ...rest]); // one round trip, run as a transaction
+      },
+    },
+  );
+  if ("problems" in sync)
+    throw new Error(`Nothing written. Fix these in Airtable, then re-run:\n- ${sync.problems.join("\n- ")}`);
+  console.log(sync.summary.join("\n"));
+  await sync.write();
   console.log("Done.");
 }
 

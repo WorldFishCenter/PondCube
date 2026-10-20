@@ -71,7 +71,10 @@ ponds or operators directly in Neon.
 - **Retiring.** A pond removed from Airtable is set to `retired` in Neon (hidden from the
   app, kept for its records); re-adding it makes it active again. To retire an operator,
   untick `active` or remove the row: either way they're deactivated, never deleted, so
-  past records keep the name.
+  past records keep the name. Renaming an operator works the same way: the old name is
+  deactivated, and the new name (with the email) is added.
+- **Feedback stays in Airtable.** The `feedback` table collects what operators send from the
+  in-app "Send feedback" form (an embedded Airtable form). It is never synced to Neon.
 - **Production needs `--prod`.** `npm run db:sync -- --prod` writes to `DATABASE_URL_PROD`;
   without the flag the sync refuses to write if `DATABASE_URL` is the production database.
   It prints the target and what will change before writing.
@@ -101,6 +104,11 @@ records can be drafted there. Saving still needs signal: a save made offline fai
 and keeps its draft. The kept page is replaced on every load with signal. It is
 first kept on the second load, because the first load comes before the worker is
 running. Test it with `next build && next start`, not `next dev`.
+
+Known limits: after sign-out, the kept page can still show the previous operator until
+the next load with signal (saves are always checked against whoever is signed in).
+Build files from old deploys stay on the device until `CACHE` in `sw.js` is bumped.
+`next.config.ts` also sets the Next.js PWA guide's security headers on every page.
 
 ## Roadmap / open decisions
 

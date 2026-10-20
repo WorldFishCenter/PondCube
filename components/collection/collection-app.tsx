@@ -4,8 +4,7 @@ import * as React from "react";
 import { Show, UserButton } from "@clerk/nextjs";
 import { Info } from "lucide-react";
 import { readLocal, writeLocal } from "@/lib/draft";
-import type { RecordKind } from "@/lib/intake";
-import type { WhoWhere } from "@/lib/validation";
+import type { RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -14,8 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PondCubeLogo } from "@/components/pondcube-logo";
+import { FeedbackSheet } from "./feedback-sheet";
 import { PondCombobox, type Pond } from "./pond-combobox";
-import { RecordedAtField, type RecordedAt } from "./record-form";
+import { RecordedAtField, type RecordFormProps } from "./record-form";
 import { WaterQualityForm } from "./water-quality-form";
 import { FeedingForm } from "./feeding-form";
 import { MortalityForm } from "./mortality-form";
@@ -24,18 +24,14 @@ import { SamplingForm } from "./sampling-form";
 const POND_KEY = "pondcube:lastPond";
 const RECORDED_AT_KEY = "pondcube:recordedAt"; // kept so a refresh mid-record doesn't lose it
 
-// The record kinds, in tab order. Each form owns its fields and its kind's draft; adding a kind is
-// one entry here plus its form (and its table + schemas in lib/).
-const RECORD_KINDS: {
-  kind: RecordKind;
-  label: string;
-  Form: React.ComponentType<{ who: WhoWhere; recordedAt: RecordedAt }>;
-}[] = [
-  { kind: "wq", label: "Water", Form: WaterQualityForm },
-  { kind: "feeding", label: "Feeding", Form: FeedingForm },
-  { kind: "mortality", label: "Mortality", Form: MortalityForm },
-  { kind: "sampling", label: "Sampling", Form: SamplingForm },
-];
+// One tab per Record kind (lib/validation.ts RECORD_KINDS; the compiler flags a missing one), in tab
+// order. Each form owns its fields and its kind's draft.
+const TABS = {
+  wq: { label: "Water", Form: WaterQualityForm },
+  feeding: { label: "Feeding", Form: FeedingForm },
+  mortality: { label: "Mortality", Form: MortalityForm },
+  sampling: { label: "Sampling", Form: SamplingForm },
+} satisfies Record<RecordKind, { label: string; Form: React.ComponentType<RecordFormProps> }>;
 
 // The selected record kind is filled with the primary colour. Stock Tabs has no filled variant,
 // so this is shadcn's className step with semantic tokens; the dark: ones beat the stock dark style.
@@ -74,11 +70,10 @@ export function CollectionSkeleton() {
 }
 
 // The person recording is the "enumerator" (schema term): the signed-in Operator, matched on the server.
-export function CollectionApp({ enumerator, ponds }: { enumerator: string; ponds: Pond[] }) {
+export function CollectionApp({ enumerator, ponds, version }: { enumerator: string; ponds: Pond[]; version: string }) {
   const [pondCode, setPondCode] = React.useState("");
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);
-  const who = { pondCode, enumerator };
 
   // Restore after hydration (server has no localStorage), so setState-in-effect is intended.
   React.useEffect(() => {
@@ -137,22 +132,23 @@ export function CollectionApp({ enumerator, ponds }: { enumerator: string; ponds
           <AlertDescription>Choose a pond above to start recording.</AlertDescription>
         </Alert>
       ) : (
-        <Tabs defaultValue={RECORD_KINDS[0].kind}>
+        <Tabs defaultValue={Object.keys(TABS)[0]}>
           <TabsList className="w-full">
-            {RECORD_KINDS.map(({ kind, label }) => (
+            {Object.entries(TABS).map(([kind, { label }]) => (
               <TabsTrigger key={kind} value={kind} className={FILLED_TAB}>
                 {label}
               </TabsTrigger>
             ))}
           </TabsList>
-          {RECORD_KINDS.map(({ kind, Form }) => (
+          {Object.entries(TABS).map(([kind, { Form }]) => (
             // Keyed by pond: switching ponds remounts the form with that pond's draft.
             <TabsContent key={kind} value={kind}>
-              <Form key={pondCode} who={who} recordedAt={when} />
+              <Form key={pondCode} pondCode={pondCode} recordedAt={when} />
             </TabsContent>
           ))}
         </Tabs>
       )}
+      <FeedbackSheet operator={enumerator} version={version} />
     </Shell>
   );
 }

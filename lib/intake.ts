@@ -3,23 +3,19 @@ import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 import { wqReadings, feedingEvents, mortalityEvents, samplingEvents, fishMeasurements } from "./schema";
-import { waterQualitySchema, feedingSchema, mortalitySchema, samplingSchema } from "./validation";
+import { RECORD_KINDS, samplingSchema, type RecordKind } from "./validation";
 
 // Record intake: validate a record of a given kind and persist it, all-or-nothing.
-//   createRecordIntake(write).save(kind, input)
+//   createRecordIntake(write).save(kind, input, enumerator)
 // Throws a ZodError for invalid input (nothing written) and rejects on unknown kinds.
-// Callers own access checks; intake owns kind → table, validation, and atomic writes.
+// Callers own access checks and name the Enumerator; intake owns kind → table, validation, and atomic writes.
 
-const RECORDS = {
-  wq: { schema: waterQualitySchema, table: wqReadings },
-  feeding: { schema: feedingSchema, table: feedingEvents },
-  mortality: { schema: mortalitySchema, table: mortalityEvents },
-  sampling: { schema: samplingSchema, table: samplingEvents }, // plus its fish measurements
-} as const;
-
-export type RecordKind = keyof typeof RECORDS;
-/** What a caller sends for a kind: the save schema's input (form values + who/where + instant). */
-export type RecordInput<K extends RecordKind> = z.input<(typeof RECORDS)[K]["schema"]>;
+const TABLES = {
+  wq: wqReadings,
+  feeding: feedingEvents,
+  mortality: mortalityEvents,
+  sampling: samplingEvents, // plus its fish measurements
+} satisfies Record<RecordKind, PgTable>;
 
 /** Rows for one table. A write is a list of these, applied all-or-nothing. */
 export type Insert = { table: PgTable; rows: Record<string, unknown>[] };
@@ -28,19 +24,21 @@ export type AtomicWriter = (inserts: Insert[]) => Promise<void>;
 
 // Parsed records insert as-is, and drizzle silently drops keys that aren't columns, so a renamed
 // field would compile and lose data. Checked once at load: a mismatch fails every build and test.
-for (const [kind, { schema, table }] of Object.entries(RECORDS)) {
+for (const [kind, table] of Object.entries(TABLES)) {
   const columns = new Set(Object.keys(getTableColumns(table)));
-  const stray = Object.keys(schema.shape).filter((key) => key !== "fish" && !columns.has(key));
+  const shape = RECORD_KINDS[kind as RecordKind].save.shape;
+  const stray = Object.keys(shape).filter((key) => key !== "fish" && !columns.has(key));
   if (stray.length) throw new Error(`Record intake: ${kind} fields with no ${kind} column: ${stray.join(", ")}`);
 }
 
 export function createRecordIntake(write: AtomicWriter) {
   return {
-    async save<K extends RecordKind>(kind: K, input: RecordInput<K>): Promise<void> {
-      if (!Object.hasOwn(RECORDS, kind)) throw new Error(`Unknown record kind: ${String(kind)}`);
-      if (kind === "sampling") return write(samplingInserts(samplingSchema.parse(input)));
-      const { schema, table } = RECORDS[kind];
-      return write([{ table, rows: [schema.parse(input)] }]);
+    /** `input` is what the device sent (untrusted); `enumerator` is the signed-in Operator and wins over it. */
+    async save(kind: RecordKind, input: unknown, enumerator: string): Promise<void> {
+      if (!Object.hasOwn(RECORD_KINDS, kind)) throw new Error(`Unknown record kind: ${String(kind)}`);
+      const record = { ...(input as object), enumerator };
+      if (kind === "sampling") return write(samplingInserts(samplingSchema.parse(record)));
+      return write([{ table: TABLES[kind], rows: [RECORD_KINDS[kind].save.parse(record)] }]);
     },
   };
 }

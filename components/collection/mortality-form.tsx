@@ -1,24 +1,24 @@
 "use client";
 
 import { Controller } from "react-hook-form";
-import { mortalityForm, type WhoWhere } from "@/lib/validation";
+import { mortalityForm } from "@/lib/validation";
 import { CAUSES } from "@/lib/options";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { NotesField, NumberField, RecordCard, type RecordedAt, useRecordForm } from "./record-form";
+import { NotesField, NumberField, RecordCard, type RecordFormProps, useRecordForm } from "./record-form";
 
 // Base UI Select: the null item is the placeholder (and lets the operator clear the choice).
 const CAUSE_ITEMS = [{ value: null, label: "Select a cause" }, ...CAUSES];
 
 const blank = () => ({ mortalityCount: "", suspectedCause: undefined, remarks: "" });
 
-export function MortalityForm({ who, recordedAt }: { who: WhoWhere; recordedAt: RecordedAt }) {
+export function MortalityForm({ pondCode, recordedAt }: RecordFormProps) {
   const { form, card } = useRecordForm({
     kind: "mortality",
     schema: mortalityForm,
     blank,
     savedMessage: () => "Mortality record saved.",
-    who,
+    pondCode,
     recordedAt,
   });
   const {

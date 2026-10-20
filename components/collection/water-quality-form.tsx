@@ -1,10 +1,10 @@
 "use client";
 
 import { Controller } from "react-hook-form";
-import { RANGES, waterQualityForm, type WhoWhere } from "@/lib/validation";
+import { RANGES, waterQualityForm } from "@/lib/validation";
 import { PERIODS } from "@/lib/options";
 import { FieldGroup } from "@/components/ui/field";
-import { ChoiceField, NotesField, NumberField, RecordCard, type RecordedAt, useRecordForm } from "./record-form";
+import { ChoiceField, NotesField, NumberField, RecordCard, type RecordFormProps, useRecordForm } from "./record-form";
 
 const range = (name: keyof typeof RANGES) => RANGES[name].join("–");
 const READINGS = [
@@ -28,13 +28,13 @@ const blank = (last?: { period: "morning" | "afternoon" }) => ({
   remarks: "",
 });
 
-export function WaterQualityForm({ who, recordedAt }: { who: WhoWhere; recordedAt: RecordedAt }) {
+export function WaterQualityForm({ pondCode, recordedAt }: RecordFormProps) {
   const { form, card } = useRecordForm({
     kind: "wq",
     schema: waterQualityForm,
     blank,
     savedMessage: () => "Water-quality reading saved.",
-    who,
+    pondCode,
     recordedAt,
   });
   const {
