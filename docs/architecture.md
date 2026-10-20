@@ -79,6 +79,17 @@ ponds or operators directly in Neon.
   without the flag the sync refuses to write if `DATABASE_URL` is the production database.
   It prints the target and what will change before writing.
 
+### Legacy history — the old Excel log
+
+Water-quality readings from before the app (the paper/Excel log, July 2025) are imported once with
+`npm run db:import-legacy -- <pondcube_observations_wide.csv>` (then `-- --prod`). The CSV comes from
+`convert_pondcube.py` next to the repo, which also documents the source in `pondcube_DATA_DICTIONARY.md`.
+Each old tank maps to its Pond through `legacy_location` + `legacy_tank_id`. The log has no times or
+names, so morning = 08:00 and afternoon = 14:00 Penang time, and the Enumerator is Mahirah Mahmuddin.
+It deliberately bypasses record intake: readings without dissolved oxygen or temperature are kept with
+blanks, and two out-of-range temperatures (114.0 and 59.3 °C, Fish Tank 3) are kept as recorded. All
+of this is listed in the script's header. Re-running is safe: readings have fixed ids.
+
 ### Vercel — hosting
 
 Next.js app deployed on Vercel, functions pinned to `sin1` (Singapore, next to the

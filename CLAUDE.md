@@ -20,15 +20,16 @@ Hosted on Vercel (functions pinned to Singapore). Node 20+.
 
 ## Commands
 
-| Command                                       | Does                                                                                                                                             |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run dev` / `build` / `start`             | Next.js                                                                                                                                          |
-| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                                    |
-| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                          |
-| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, record intake, Airtable sync, operator access — against in-memory Postgres (PGLite, no network) |
-| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                         |
-| `npm run db:sync`                             | Check, then copy ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                         |
-| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                                             |
+| Command                                       | Does                                                                                                                                                            |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev` / `build` / `start`             | Next.js                                                                                                                                                         |
+| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                                                   |
+| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                                         |
+| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, record intake, Airtable sync, operator access, legacy import — against in-memory Postgres (PGLite, no network) |
+| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                                        |
+| `npm run db:sync`                             | Check, then copy ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                                        |
+| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                                                            |
+| `npm run db:import-legacy -- <csv>`           | One-off: legacy water-quality log (converted CSV) → `wq_readings`, checked, all-or-nothing; `-- --prod` as above                                                |
 
 Run `npm run check`, `npm run typecheck` and `npm run format:check` before committing.
 
@@ -60,6 +61,7 @@ lib/db.ts                 Neon HTTP + Drizzle client (server-only)
 lib/options.ts            Choice lists (periods, feed types, causes)
 lib/version.ts            App version from package.json (server-only: footer, feedback form)
 scripts/sync-airtable.ts  Airtable (PondCube base: ponds, operators) → Neon assets/operators
+scripts/import-legacy.ts  One-off: legacy Excel log (converted CSV) → wq_readings; its decisions are in the file header
 scripts/check-*.ts        The self-checks run by `npm run check`
 ```
 

@@ -239,6 +239,24 @@ async function fetchTable(table: string): Promise<Fields[]> {
   return rows;
 }
 
+/** DATABASE_URL, or DATABASE_URL_PROD only with --prod: production is never written by accident. */
+export function neonTarget(prod: boolean): SyncTarget {
+  const url = prod ? process.env.DATABASE_URL_PROD : process.env.DATABASE_URL;
+  if (!url) throw new Error(`${prod ? "DATABASE_URL_PROD" : "DATABASE_URL"} not set`);
+  const host = (u: string | undefined) => (u ? new URL(u).hostname : undefined);
+  if (!prod && host(url) === host(process.env.DATABASE_URL_PROD))
+    throw new Error("DATABASE_URL is the production database; run with --prod to write there.");
+  console.log(`Target: ${prod ? "PRODUCTION" : "development"} database (${host(url)})`);
+  const db = drizzle(neon(url));
+  return {
+    db,
+    writeAll: (build) => {
+      const [first, ...rest] = build(db);
+      return db.batch([first, ...rest]); // one round trip, run as a transaction
+    },
+  };
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const prod = args.includes("--prod");
@@ -246,29 +264,12 @@ async function main() {
   if (only && only !== "ponds" && only !== "operators")
     throw new Error(`Unknown table "${only}". Use: ponds, operators`);
 
-  // Production only on purpose: --prod targets DATABASE_URL_PROD, and DATABASE_URL may not point there.
-  const url = prod ? process.env.DATABASE_URL_PROD : process.env.DATABASE_URL;
-  if (!url) throw new Error(`${prod ? "DATABASE_URL_PROD" : "DATABASE_URL"} not set`);
-  const host = (u: string | undefined) => (u ? new URL(u).hostname : undefined);
-  if (!prod && host(url) === host(process.env.DATABASE_URL_PROD))
-    throw new Error("DATABASE_URL is the production database; run with --prod to write there.");
-  console.log(`Target: ${prod ? "PRODUCTION" : "development"} database (${host(url)})`);
-
+  const target = neonTarget(prod);
   const [ponds, ops] = await Promise.all([
     only === "operators" ? undefined : fetchTable("ponds"),
     only === "ponds" ? undefined : fetchTable("operators"),
   ]);
-  const db = drizzle(neon(url));
-  const sync = await prepareSync(
-    { ponds, operators: ops },
-    {
-      db,
-      writeAll: (build) => {
-        const [first, ...rest] = build(db);
-        return db.batch([first, ...rest]); // one round trip, run as a transaction
-      },
-    },
-  );
+  const sync = await prepareSync({ ponds, operators: ops }, target);
   if ("problems" in sync)
     throw new Error(`Nothing written. Fix these in Airtable, then re-run:\n- ${sync.problems.join("\n- ")}`);
   console.log(sync.summary.join("\n"));
