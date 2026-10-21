@@ -23,7 +23,14 @@ async function App() {
         <NotOnListCard />
       </Shell>
     );
-  return <CollectionApp enumerator={access.operator} ponds={await getPonds()} version={APP_VERSION} />;
+  return (
+    <CollectionApp
+      enumerator={access.operator}
+      account={access.account}
+      ponds={await getPonds()}
+      version={APP_VERSION}
+    />
+  );
 }
 
 export default function Page() {

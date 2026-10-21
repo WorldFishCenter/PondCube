@@ -6,7 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { format, parse } from "date-fns";
 import { AlertCircle, CheckCircle2, ChevronDownIcon } from "lucide-react";
-import { saveRecord } from "@/lib/actions";
 import { createDraft, draftKey, type Submitted } from "@/lib/draft";
 import type { RECORD_KINDS, RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -28,45 +27,48 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import type { Outbox } from "./outbox";
 
-type Result = { ok: boolean; msg: string } | null;
+type Result = { ok: boolean; title: string; msg: string } | null;
 type Message = { message?: string } | undefined;
 
 /** Recorded-at, held by the app shell for every record kind: local "YYYY-MM-DDTHH:mm", "" until set. */
 export type RecordedAt = { value: string; clear: () => void };
 /** What every record form gets from the app shell. */
-export type RecordFormProps = { pondCode: string; recordedAt: RecordedAt };
+export type RecordFormProps = { pondCode: string; recordedAt: RecordedAt; outbox: Outbox };
 
-const NOT_SAVED: Record<Exclude<Submitted, "saved">, string> = {
+type Submission = { id: string; msg: string } | Exclude<Submitted, "kept"> | null;
+const NOT_SAVED: Record<Exclude<Submitted, "kept">, string> = {
   noRecordedAt: "Set the date & time at the top before saving.",
-  locked: "Sign in again. Your entry is kept as a draft.",
-  failed: "Could not save. Your entry is kept as a draft; check your connection and try again.",
+  notKept:
+    "This device has no room to keep it and it couldn't be sent. Your entry is still here: try again with signal.",
 };
 
-// Binds a record form to this pond's Draft (lib/draft.ts): restore it, keep every edit, submit; once
-// saved, start the next record (recorded-at too, so it needs its own). `blank` must be module-level (stable).
-export function useRecordForm<K extends RecordKind, TValues extends FieldValues, TRecord extends object>({
+// A record form on this pond's Draft (lib/draft.ts); Save hands it to the Outbox. `blank` must be module-level.
+export function useRecordForm<K extends RecordKind, TValues extends FieldValues, TRecord extends { id: string }>({
   kind,
   schema,
   blank,
   savedMessage,
   pondCode,
   recordedAt,
+  outbox,
 }: RecordFormProps & {
   kind: K;
   schema: z.ZodType<TRecord, TValues> & (typeof RECORD_KINDS)[K]["form"]; // must be this kind's form schema
   blank: (last?: TRecord) => TValues; // empty number fields are "": reset() with undefined leaves inputs filled
   savedMessage: (record: TRecord) => string;
 }) {
-  const [result, setResult] = React.useState<Result>(null);
+  const [submitted, setSubmitted] = React.useState<Submission>(null);
   const form = useForm<TValues, unknown, TRecord>({
     resolver: zodResolver<TValues, unknown, TRecord>(schema),
     defaultValues: blank() as DefaultValues<TValues>,
   });
   const { reset, watch, handleSubmit, formState } = form;
+  const { add } = outbox; // stable across renders, unlike the outbox object
   const draft = React.useMemo(
-    () => createDraft<TValues>(draftKey(kind, pondCode), (record) => saveRecord(kind, { ...record, pondCode })),
-    [kind, pondCode],
+    () => createDraft<TValues, TRecord>(draftKey(kind, pondCode), (record) => add(kind, { ...record, pondCode })),
+    [kind, pondCode, add],
   );
 
   // Show this pond's draft on mount (tabs unmount inactive forms; the shell remounts forms per pond).
@@ -79,18 +81,28 @@ export function useRecordForm<K extends RecordKind, TValues extends FieldValues,
   }, [draft, watch]);
 
   const onSubmit = handleSubmit(async (record) => {
-    setResult(null);
+    setSubmitted(null);
     const outcome = await draft.submit(record, recordedAt.value);
-    if (outcome !== "saved") {
-      setResult({ ok: false, msg: NOT_SAVED[outcome] });
+    if (outcome !== "kept") {
+      setSubmitted(outcome);
       return;
     }
     draft.muted(() => reset(blank(record)));
     recordedAt.clear();
-    setResult({ ok: true, msg: savedMessage(record) });
+    setSubmitted({ id: record.id, msg: savedMessage(record) });
   });
 
+  const result = resultOf(submitted, outbox);
   return { form, card: { onSubmit, result, pending: formState.isSubmitting } };
+}
+
+// The form's message follows the Record until the server has it.
+function resultOf(submitted: Submission, { isWaiting, sending }: Outbox): Result {
+  if (!submitted) return null;
+  if (typeof submitted === "string") return { ok: false, title: "Not saved", msg: NOT_SAVED[submitted] };
+  if (!isWaiting(submitted.id)) return { ok: true, title: "Saved", msg: submitted.msg };
+  const next = sending ? "Sending…" : "It will be sent when there's signal.";
+  return { ok: true, title: "Saved on this device", msg: `${submitted.msg} ${next}` };
 }
 
 export function RecordCard({
@@ -131,7 +143,7 @@ export function RecordCard({
         {result ? (
           <Alert variant={result.ok ? "default" : "destructive"}>
             {result.ok ? <CheckCircle2 /> : <AlertCircle />}
-            <AlertTitle>{result.ok ? "Saved" : "Not saved"}</AlertTitle>
+            <AlertTitle>{result.title}</AlertTitle>
             <AlertDescription>{result.msg}</AlertDescription>
           </Alert>
         ) : null}

@@ -28,14 +28,13 @@ const blank = (last?: { period: "morning" | "afternoon" }) => ({
   remarks: "",
 });
 
-export function WaterQualityForm({ pondCode, recordedAt }: RecordFormProps) {
+export function WaterQualityForm(props: RecordFormProps) {
   const { form, card } = useRecordForm({
     kind: "wq",
     schema: waterQualityForm,
     blank,
     savedMessage: () => "Water-quality reading saved.",
-    pondCode,
-    recordedAt,
+    ...props,
   });
   const {
     register,

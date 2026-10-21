@@ -13,37 +13,44 @@ self.addEventListener("activate", (event) =>
 );
 
 const keep = (event, key, response) => event.waitUntil(caches.open(CACHE).then((cache) => cache.put(key, response)));
+const isBuildFile = (url) => url.origin === self.location.origin && url.pathname.startsWith("/_next/static/");
+
+// Pages: network first, so with signal the page is always current; kept under its path.
+const page = (event, request, path) =>
+  fetch(request).then((response) => {
+    if (response.ok) keep(event, path, response.clone());
+    return response;
+  });
+
+// Build files: cache first, keeping only those served immutable (never `next dev`'s).
+const buildFile = (event, request) =>
+  caches.match(request).then(
+    (hit) =>
+      hit ??
+      fetch(request).then((response) => {
+        if (response.ok && response.headers.get("cache-control")?.includes("immutable"))
+          keep(event, request, response.clone());
+        return response;
+      }),
+  );
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
-
-  // Pages: network first, so with signal the page is always current; offline, the last one loaded.
-  if (request.mode === "navigate") {
+  if (request.mode === "navigate")
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) keep(event, url.pathname, response.clone());
-          return response;
-        })
-        .catch(async () => (await caches.match(url.pathname)) ?? Response.error()),
+      page(event, request, url.pathname).catch(async () => (await caches.match(url.pathname)) ?? Response.error()),
     );
-    return;
-  }
+  else if (isBuildFile(url)) event.respondWith(buildFile(event, request));
+});
 
-  // Build files: cache first, keeping only those served immutable (never `next dev`'s).
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(
-      caches.match(request).then(
-        (hit) =>
-          hit ??
-          fetch(request).then((response) => {
-            if (response.ok && response.headers.get("cache-control")?.includes("immutable"))
-              keep(event, request, response.clone());
-            return response;
-          }),
-      ),
-    );
-  }
+// The app asks when this worker didn't see it load as the signed-in app (a first load, a sign-in).
+self.addEventListener("message", (event) => {
+  if (!Array.isArray(event.data?.keep)) return;
+  const path = new URL(event.source.url).pathname;
+  const files = event.data.keep.map((name) => new URL(name)).filter(isBuildFile);
+  event.waitUntil(
+    Promise.all([page(event, path, path), ...files.map((url) => buildFile(event, url.href))]).catch(() => {}), // no signal: keep what's there
+  );
 });

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Show, UserButton } from "@clerk/nextjs";
 import { Info } from "lucide-react";
-import { readLocal, writeLocal } from "@/lib/draft";
+import { readLocal, writeLocal } from "@/lib/storage";
 import type { RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PondCubeLogo } from "@/components/pondcube-logo";
+import { useKeepForOffline } from "@/components/service-worker";
 import { FeedbackSheet } from "./feedback-sheet";
+import { OutboxAlert, useOutbox } from "./outbox";
 import { PondCombobox, type Pond } from "./pond-combobox";
 import { RecordedAtField, type RecordFormProps } from "./record-form";
 import { WaterQualityForm } from "./water-quality-form";
@@ -70,10 +72,21 @@ export function CollectionSkeleton() {
 }
 
 // The person recording is the "enumerator" (schema term): the signed-in Operator, matched on the server.
-export function CollectionApp({ enumerator, ponds, version }: { enumerator: string; ponds: Pond[]; version: string }) {
+export function CollectionApp({
+  enumerator,
+  account,
+  ponds,
+  version,
+}: {
+  enumerator: string;
+  account: string;
+  ponds: Pond[];
+  version: string;
+}) {
   const [pondCode, setPondCode] = React.useState("");
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);
+  const outbox = useOutbox(account, enumerator);
 
   // Restore after hydration (server has no localStorage), so setState-in-effect is intended.
   React.useEffect(() => {
@@ -82,6 +95,7 @@ export function CollectionApp({ enumerator, ponds, version }: { enumerator: stri
     setRecordedAt(readLocal(RECORDED_AT_KEY) ?? "");
     setRestored(true);
   }, []);
+  useKeepForOffline(); // the page that opens with no signal is this one, signed in
   const choosePond = (code: string) => {
     setPondCode(code);
     writeLocal(POND_KEY, code);
@@ -116,6 +130,7 @@ export function CollectionApp({ enumerator, ponds, version }: { enumerator: stri
             <div className="md:col-span-2">
               <RecordedAtField id="recorded-at" value={recordedAt} onChange={chooseRecordedAt} />
             </div>
+            <OutboxAlert outbox={outbox} className="md:col-span-2" />
           </FieldGroup>
         </CardContent>
       </Card>
@@ -143,7 +158,7 @@ export function CollectionApp({ enumerator, ponds, version }: { enumerator: stri
           {Object.entries(TABS).map(([kind, { Form }]) => (
             // Keyed by pond: switching ponds remounts the form with that pond's draft.
             <TabsContent key={kind} value={kind}>
-              <Form key={pondCode} pondCode={pondCode} recordedAt={when} />
+              <Form key={pondCode} pondCode={pondCode} recordedAt={when} outbox={outbox} />
             </TabsContent>
           ))}
         </Tabs>

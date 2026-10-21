@@ -20,16 +20,16 @@ Hosted on Vercel (functions pinned to Singapore). Node 20+.
 
 ## Commands
 
-| Command                                       | Does                                                                                                                                                            |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev` / `build` / `start`             | Next.js                                                                                                                                                         |
-| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                                                   |
-| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                                         |
-| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, record intake, Airtable sync, operator access, legacy import — against in-memory Postgres (PGLite, no network) |
-| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                                        |
-| `npm run db:sync`                             | Check, then copy ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                                        |
-| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                                                            |
-| `npm run db:import-legacy -- <csv>`           | One-off: legacy water-quality log (converted CSV) → `wq_readings`, checked, all-or-nothing; `-- --prod` as above                                                |
+| Command                                       | Does                                                                                                                                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev` / `build` / `start`             | Next.js                                                                                                                                                                 |
+| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                                                           |
+| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                                                 |
+| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, outbox, record intake, Airtable sync, operator access, legacy import — against in-memory Postgres (PGLite, no network) |
+| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                                                |
+| `npm run db:sync`                             | Check, then copy ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                                                |
+| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                                                                    |
+| `npm run db:import-legacy -- <csv>`           | One-off: legacy water-quality log (converted CSV) → `wq_readings`, checked, all-or-nothing; `-- --prod` as above                                                        |
 
 Run `npm run check`, `npm run typecheck` and `npm run format:check` before committing.
 
@@ -39,30 +39,33 @@ Run `npm run check`, `npm run typecheck` and `npm run format:check` before commi
 app/page.tsx              Signed-in operator check per request (Suspense), then cached ponds
 app/layout.tsx            Inter font (shadcn preset), viewport, ClerkProvider (shadcn theme), ThemeProvider
 app/sign-in, app/sign-up  Clerk's sign-in / sign-up pages; proxy.ts = clerkMiddleware (routes stay public)
+app/api/records/route.ts  Where the Outbox sends each Record (POST); Enumerator = signed-in operator
 app/globals.css           shadcn theme tokens (incl. --logo-outline) + 44px touch-target rule
 app/icon.svg              Favicon (outline follows OS theme); apple-icon.png = iOS home screen
 app/manifest.ts           Web app manifest (installable); icons in public/icon-*.png
 public/sw.js              Service worker: last page + build files kept so the app opens offline
-components/service-worker.tsx   Registers public/sw.js
+components/service-worker.tsx   Registers public/sw.js; useKeepForOffline() = keep this page when the worker didn't see it load (first load, sign-in)
 components/ui/*            Stock shadcn components (Base UI). Do NOT edit by hand.
 components/theme-provider.tsx, theme-toggle.tsx   shadcn dark mode (next-themes); one-tap light↔dark switch
 components/pondcube-logo.tsx   Logo mark for in-app use (same artwork as app/icon.svg)
 components/collection/*    App UI: shell (who/where/when panel, record kinds → tabs), not-on-list card, pond picker,
-                          the 4 forms, feedback sheet (Airtable form); record-form.tsx = shared form hook (draft, save) + fields
+                          the 4 forms, feedback sheet (Airtable form); record-form.tsx = shared form hook (draft, save) + fields;
+                          outbox.tsx = sending to app/api/records + the "waiting to send" notice
 lib/schema.ts             Drizzle tables — the single source of truth for the data model
 lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules; RECORD_KINDS
 lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing; the caller names the Enumerator
 lib/data.ts               Server-only cached reads (ponds, operator by email)
-lib/actions.ts            Server action: saveRecord(kind, input); Enumerator = signed-in operator
 lib/access.ts             Signed-in access: wires Clerk into lib/operators.ts (server-only)
 lib/operators.ts          Operator access: account → signed out / not on the list / Operator; email normaliser (shared with sync)
-lib/draft.ts              Draft per record kind + pond: restore, change, submit (only a save clears it; storage + save injected); remembered pond
+lib/storage.ts            Device storage seam (localStorage, guarded): Drafts, Outbox, remembered pond and Recorded-at
+lib/draft.ts              Draft per record kind + pond: restore, change, submit to the Outbox (only that clears it; storage + keep injected)
+lib/outbox.ts             Outbox: saved Records waiting on the device, sent one at a time, removed only once stored (storage + send injected)
 lib/db.ts                 Neon HTTP + Drizzle client (server-only)
 lib/options.ts            Choice lists (periods, feed types, causes)
 lib/version.ts            App version from package.json (server-only: footer, feedback form)
 scripts/sync-airtable.ts  Airtable (PondCube base: ponds, operators) → Neon assets/operators
 scripts/import-legacy.ts  One-off: legacy Excel log (converted CSV) → wq_readings; its decisions are in the file header
-scripts/check-*.ts        The self-checks run by `npm run check`
+scripts/check-*.ts        The self-checks run by `npm run check` (fake-storage.ts: their storage adapters)
 ```
 
 ## How to work
@@ -110,21 +113,23 @@ These favour care over speed; on trivial tasks, use judgment.
   writing Next.js code (see @AGENTS.md).
 - **Validation is defined once and enforced twice.** `RANGES` and the zod schemas
   in `lib/validation.ts` are the only place bounds live. The form schema runs on
-  the device for instant feedback; the save schema re-runs in the server action
+  the device for instant feedback; the save schema re-runs in `app/api/records`
   before intake. The database never receives an out-of-range value silently. Add a
   bound by editing `RANGES`/the schema, not the UI.
 - **Record intake is all-or-nothing.** A record is stored whole or not at all — a
   Sampling event never persists without its Fish measurements. Keep new write paths
-  going through `lib/intake.ts`.
+  going through `lib/intake.ts`. Every Record carries an id made on the device;
+  intake skips one already stored, so a resend never duplicates it.
 - **Drafts must survive interruption.** Each form autosaves to `localStorage` per
   record kind and pond; a refresh, lost signal or pond switch must not lose a
-  half-entered record. Drafts clear only on successful save. Don't add a code path
-  that can drop an unsaved draft.
+  half-entered record. A Draft clears only once its Record is in the Outbox, and the
+  Outbox drops a Record only once the server has stored it. Don't add a code path
+  that can drop either.
 - **Recorded-at is an instant, not a wall-clock string.** The device reads local
   time; the server accepts only a Date or an ISO string with an offset/Z, so an
   observation's true instant is preserved regardless of server timezone.
-- **Server-only boundaries.** `lib/db.ts`, `lib/data.ts`, `lib/access.ts` and the
-  server actions are server-only. Never import them into client components or leak
+- **Server-only boundaries.** `lib/db.ts`, `lib/data.ts`, `lib/access.ts` and
+  `app/api/*` are server-only. Never import them into client components or leak
   `DATABASE_URL`/`CLERK_SECRET_KEY` to the client.
 - **Everything keys on `pond_code`.** It's the join across assets, every event
   table, legacy history, and (later) sensor data.

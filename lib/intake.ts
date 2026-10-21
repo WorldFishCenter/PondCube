@@ -1,13 +1,13 @@
 import { getTableColumns } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
-import type { PgTable } from "drizzle-orm/pg-core";
+import type { AnyPgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
 import { wqReadings, feedingEvents, mortalityEvents, samplingEvents, fishMeasurements } from "./schema";
 import { RECORD_KINDS, samplingSchema, type RecordKind } from "./validation";
 
 // Record intake: validate a record of a given kind and persist it, all-or-nothing.
 //   createRecordIntake(write, appVersion).save(kind, input, enumerator)
-// Throws a ZodError for invalid input (nothing written) and rejects on unknown kinds.
+// Throws a ZodError for invalid input (nothing written) and rejects on unknown kinds. A stored id is a resend: skipped.
 // Callers own access checks and name the Enumerator; intake owns kind → table, validation, and atomic writes.
 
 const TABLES = {
@@ -18,9 +18,13 @@ const TABLES = {
 } satisfies Record<RecordKind, PgTable>;
 
 /** Rows for one table. A write is a list of these, applied all-or-nothing. */
-export type Insert = { table: PgTable; rows: Record<string, unknown>[] };
+export type Insert = { table: PgTable & { id: AnyPgColumn }; rows: Record<string, unknown>[] };
 /** The seam to the database. Adapters: neonWriter (production), a PGLite transaction (tests). */
 export type AtomicWriter = (inserts: Insert[]) => Promise<void>;
+
+/** The statements for a write, for every adapter: a row whose id is already stored is skipped. */
+export const insertStatements = (db: PgDatabase<PgQueryResultHKT>, inserts: Insert[]) =>
+  inserts.map(({ table, rows }) => db.insert(table).values(rows).onConflictDoNothing({ target: table.id }));
 
 // Parsed records insert as-is, and drizzle silently drops keys that aren't columns, so a renamed
 // field would compile and lose data. Checked once at load: a mismatch fails every build and test.
@@ -44,13 +48,12 @@ export function createRecordIntake(write: AtomicWriter, appVersion: string) {
   };
 }
 
-// A sampling event and its fish measurements: the id is made here so both go in one write.
+// A sampling event and its fish measurements, in one write.
 function samplingInserts({ fish, ...event }: z.output<typeof samplingSchema>, appVersion: string): Insert[] {
-  const id = crypto.randomUUID();
   const measured: (typeof fishMeasurements.$inferInsert)[] = fish
     .filter((f) => f.weightG !== undefined || f.lengthCm !== undefined) // schema guarantees ≥ 1
-    .map((f) => ({ samplingEventId: id, weightG: f.weightG, lengthCm: f.lengthCm }));
-  const eventRow: typeof samplingEvents.$inferInsert = { ...event, id, appVersion };
+    .map((f) => ({ id: f.id, samplingEventId: event.id, weightG: f.weightG, lengthCm: f.lengthCm }));
+  const eventRow: typeof samplingEvents.$inferInsert = { ...event, appVersion };
   return [
     { table: samplingEvents, rows: [eventRow] },
     { table: fishMeasurements, rows: measured },
@@ -61,6 +64,6 @@ function samplingInserts({ fish, ...event }: z.output<typeof samplingSchema>, ap
 export const neonWriter =
   (db: NeonHttpDatabase): AtomicWriter =>
   async (inserts) => {
-    const [first, ...rest] = inserts.map(({ table, rows }) => db.insert(table).values(rows));
+    const [first, ...rest] = insertStatements(db, inserts);
     await db.batch([first, ...rest]);
   };

@@ -12,14 +12,13 @@ const CAUSE_ITEMS = [{ value: null, label: "Select a cause" }, ...CAUSES];
 
 const blank = () => ({ mortalityCount: "", suspectedCause: undefined, remarks: "" });
 
-export function MortalityForm({ pondCode, recordedAt }: RecordFormProps) {
+export function MortalityForm(props: RecordFormProps) {
   const { form, card } = useRecordForm({
     kind: "mortality",
     schema: mortalityForm,
     blank,
     savedMessage: () => "Mortality record saved.",
-    pondCode,
-    recordedAt,
+    ...props,
   });
   const {
     register,

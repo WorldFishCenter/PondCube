@@ -53,13 +53,17 @@ const recordedAtInstant = z
 // Each record type has a form schema (what the operator fills in, checked on the device) and a
 // save schema (form + who/where + recorded-at instant, re-checked by record intake before insert).
 // Where is the Pond picked in the app shell; who is the Enumerator, added on the server.
+// Ids are made on the device when Save checks the form, and required on save: intake skips a resend.
+const madeAtSave = () => z.uuid().default(() => crypto.randomUUID());
 const forSave = {
+  id: z.uuid(),
   pondCode: z.string().min(1, "Select a pond"),
   enumerator: z.string().min(1),
   recordedAt: recordedAtInstant,
 };
 
 export const waterQualityForm = z.object({
+  id: madeAtSave(),
   period: enumOf(PERIODS, "Select time of day"),
   dissolvedOxygen: reqNum(...RANGES.dissolvedOxygen, "Dissolved oxygen"),
   temperature: reqNum(...RANGES.temperature, "Temperature"),
@@ -72,6 +76,7 @@ export const waterQualityForm = z.object({
 export const waterQualitySchema = waterQualityForm.extend(forSave);
 
 export const feedingForm = z.object({
+  id: madeAtSave(),
   feedType: enumOf(FEED_TYPES).optional(),
   feedTypeOther: z.string().optional(),
   feedAmountKg: reqNum(0, 100000, "Amount fed (kg)"),
@@ -81,22 +86,27 @@ export const feedingForm = z.object({
 export const feedingSchema = feedingForm.extend(forSave);
 
 export const mortalityForm = z.object({
+  id: madeAtSave(),
   mortalityCount: reqNum(0, 1000000, "Number of dead fish", true),
   suspectedCause: enumOf(CAUSES).optional(),
   remarks: z.string().optional(),
 });
 export const mortalitySchema = mortalityForm.extend(forSave);
 
-export const samplingForm = z.object({
-  notes: z.string().optional(),
-  fish: z
-    .array(z.object({ weightG: optNum(0.0001, 1000000), lengthCm: optNum(0.0001, 1000) }))
+const fishMeasurements = <Id extends z.ZodType<string>>(id: Id) =>
+  z
+    .array(z.object({ id, weightG: optNum(0.0001, 1000000), lengthCm: optNum(0.0001, 1000) }))
     .refine(
       (fish) => fish.some((f) => f.weightG !== undefined || f.lengthCm !== undefined),
       "Add at least one fish measurement",
-    ),
+    );
+
+export const samplingForm = z.object({
+  id: madeAtSave(),
+  notes: z.string().optional(),
+  fish: fishMeasurements(madeAtSave()),
 });
-export const samplingSchema = samplingForm.extend(forSave);
+export const samplingSchema = samplingForm.extend({ ...forSave, fish: fishMeasurements(z.uuid()) });
 
 /** The Record kinds. Record intake adds each one's table and the app each one's tab, checked complete by the compiler. */
 export const RECORD_KINDS = {

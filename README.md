@@ -49,9 +49,12 @@ The four kinds of observation:
   one-handed, and no fiddly controls.
 - **One sign-in, then out of the way.** Each operator signs in once on their device
   with their own account, and every record they save carries their name.
-- **Nothing lost to a bad signal.** A half-finished record is saved on the device
-  as you go and is still there after a refresh, a lost connection, or switching
-  ponds. It clears only once the record is safely saved.
+- **Works without signal.** A half-finished record is kept on the device as you
+  go and is still there after a refresh, a lost connection, or switching ponds.
+  Saving works with no signal too: saved records wait on the device and are sent
+  by themselves once there's signal, and a weak connection never stores one twice.
+  Use the app from the home screen, not a browser tab, so waiting records can't be
+  cleared by the browser.
 - **Bad numbers can't get in.** A reading outside its plausible range (say
   dissolved oxygen above 20 mg/L) is refused as it's typed — and checked again
   before it's stored — so the dataset stays clean at the source.

@@ -9,14 +9,13 @@ import { ChoiceField, NotesField, NumberField, RecordCard, type RecordFormProps,
 
 const blank = () => ({ feedType: undefined, feedTypeOther: "", feedAmountKg: "", feedingsCount: "", remarks: "" });
 
-export function FeedingForm({ pondCode, recordedAt }: RecordFormProps) {
+export function FeedingForm(props: RecordFormProps) {
   const { form, card } = useRecordForm({
     kind: "feeding",
     schema: feedingForm,
     blank,
     savedMessage: () => "Feeding event saved.",
-    pondCode,
-    recordedAt,
+    ...props,
   });
   const {
     register,

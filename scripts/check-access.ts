@@ -8,6 +8,7 @@ import * as schema from "../lib/schema";
 import { accessFor, findOperator } from "../lib/operators";
 
 const account = (emailAddress: string, status = "verified") => ({
+  id: "user_1",
   primaryEmailAddress: { emailAddress, verification: { status } },
 });
 
@@ -25,10 +26,11 @@ async function main() {
   const access = (a: Parameters<typeof accessFor>[0]) => accessFor(a, (email) => findOperator(db, email));
 
   assert.equal(await access(null), "signedOut");
-  assert.deepEqual(await access(account("ana@x.org")), { operator: "Ana" }, "the match names the Enumerator");
-  assert.deepEqual(await access(account(" Ana@X.org ")), { operator: "Ana" }, "emails compare normalised");
+  const ana = { operator: "Ana", account: "user_1" };
+  assert.deepEqual(await access(account("ana@x.org")), ana, "the match names the Enumerator and the account");
+  assert.deepEqual(await access(account(" Ana@X.org ")), ana, "emails compare normalised");
   assert.equal(await access(account("ana@x.org", "unverified")), "notOnList", "only a verified email counts");
-  assert.equal(await access({ primaryEmailAddress: null }), "notOnList");
+  assert.equal(await access({ id: "user_2", primaryEmailAddress: null }), "notOnList");
   assert.equal(await access(account("ben@x.org")), "notOnList", "a deactivated operator can't record");
   assert.equal(await access(account("someone@x.org")), "notOnList");
 

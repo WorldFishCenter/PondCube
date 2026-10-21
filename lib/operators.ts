@@ -9,8 +9,12 @@ import { operators } from "./schema";
 /** How emails are compared everywhere: Airtable sync stores them this way, sign-in looks them up this way. */
 export const normaliseEmail = (email: string) => email.trim().toLowerCase();
 
-export type Access = "signedOut" | "notOnList" | { operator: string };
-type Account = { primaryEmailAddress: { emailAddress: string; verification: { status: string } | null } | null };
+/** `account` is the sign-in account's id: stable when the Operator is renamed in Airtable. */
+export type Access = "signedOut" | "notOnList" | { operator: string; account: string };
+type Account = {
+  id: string;
+  primaryEmailAddress: { emailAddress: string; verification: { status: string } | null } | null;
+};
 
 /** The account's access; `operatorByEmail` looks up an active operator's name by normalised email. */
 export async function accessFor(
@@ -21,7 +25,7 @@ export async function accessFor(
   const email = account.primaryEmailAddress;
   if (email?.verification?.status !== "verified") return "notOnList";
   const operator = await operatorByEmail(normaliseEmail(email.emailAddress));
-  return operator ? { operator } : "notOnList";
+  return operator ? { operator, account: account.id } : "notOnList";
 }
 
 /** The active operator with this normalised email, by name, or null. */

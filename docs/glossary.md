@@ -83,10 +83,17 @@ _Avoid_: limit, threshold
 
 **Draft**
 A Record still being filled in, kept on the device per Record kind and Pond until
-it is saved.
+it is saved (it then moves to the Outbox).
 _Avoid_: autosave, cache, unsaved form
+
+**Outbox**
+The saved Records on a device that the server hasn't received yet. Each waits there,
+with its own Recorded-at, until there's signal and the Operator who made it is signed
+in; it leaves only once the server has it. Shown in the app as "waiting to send".
+_Avoid_: queue, pending, sync
 
 **Record intake**
 Accepting a Record into the PondCube dataset: checked against its Ranges and stored
-whole or not at all (a Sampling event never without its Fish measurements).
+whole or not at all (a Sampling event never without its Fish measurements). A Record
+sent twice (its first reply was lost) is stored once.
 _Avoid_: submission handling, insert

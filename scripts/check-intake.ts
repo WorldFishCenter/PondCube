@@ -7,7 +7,7 @@ import { count, eq } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import * as schema from "../lib/schema";
-import { createRecordIntake, type AtomicWriter } from "../lib/intake";
+import { createRecordIntake, insertStatements, type AtomicWriter } from "../lib/intake";
 import type { RecordKind } from "../lib/validation";
 
 async function main() {
@@ -20,10 +20,16 @@ async function main() {
   // Test adapter at the intake seam: a PGLite transaction (Neon's adapter uses batch).
   const pgliteWriter: AtomicWriter = (inserts) =>
     db.transaction(async (tx) => {
-      for (const { table, rows } of inserts) await tx.insert(table).values(rows);
+      for (const statement of insertStatements(tx, inserts)) await statement;
     });
   const intake = createRecordIntake(pgliteWriter, "9.9.9"); // the server's app version
-  const save = (kind: RecordKind, input: object) => intake.save(kind, input, "Operator 1"); // the signed-in Operator
+  // As a device sends it: ids made at Save unless the input has them (a resend). "Operator 1" is signed in.
+  const id = () => crypto.randomUUID();
+  const save = (kind: RecordKind, input: { fish?: object[]; [field: string]: unknown }) => {
+    const sent = { id: id(), ...input };
+    if (input.fish) sent.fish = input.fish.map((f) => ({ id: id(), ...f }));
+    return intake.save(kind, sent, "Operator 1");
+  };
 
   await db.insert(schema.assets).values({
     pondCode: "PEN-FT1-001",
@@ -91,6 +97,29 @@ async function main() {
   await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ weightG: "50" }] }));
   await client.exec("ALTER TABLE fish_measurements_off RENAME TO fish_measurements");
   assert.equal(await rows(schema.samplingEvents), 1, "no orphan sampling event");
+
+  // A resend (same id, its first reply lost) is skipped: the Record, and a Sampling event's fish, are stored once.
+  const again = { ...who, recordedAt, id: id() };
+  await save("mortality", { ...again, mortalityCount: "4" });
+  await save("mortality", { ...again, mortalityCount: "4" });
+  assert.equal(await rows(schema.mortalityEvents), 2, "one new mortality record, not two");
+  const sample = {
+    ...again,
+    id: id(),
+    fish: [
+      { id: id(), weightG: "10" },
+      { id: id(), weightG: "11" },
+    ],
+  };
+  await save("sampling", sample);
+  const fishBefore = await rows(schema.fishMeasurements);
+  await save("sampling", sample);
+  assert.equal(await rows(schema.samplingEvents), 2);
+  assert.equal(await rows(schema.fishMeasurements), fishBefore, "a resent Sampling event adds no fish");
+  await assert.rejects(
+    save("mortality", { ...who, recordedAt, id: undefined, mortalityCount: "1" }),
+    "no id, not stored",
+  );
 
   // The Enumerator is the caller's (the signed-in Operator), whatever the device sends.
   await save("feeding", { ...who, recordedAt, feedAmountKg: "1", enumerator: "Someone else" });

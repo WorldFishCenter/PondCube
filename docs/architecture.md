@@ -14,10 +14,10 @@ Operator has their own Clerk account; the server names the Enumerator from it.
 ```
 device (phone/tablet)                 server (Vercel, sin1)        data (Neon Postgres, Singapore)
 ─────────────────────                 ─────────────────────        ──────────────────────────────
-sign in, pick pond                    server action:               assets        (ponds, static)
-fill a record  ──── draft in ────▶    signed-in operator           operators     (name + email)
-  (validated locally)  localStorage   → re-validate (same zod)      wq_readings
-                                       → record intake (all/none)   feeding_events
+sign in, pick pond                    POST /api/records:           assets        (ponds, static)
+fill a record  ── draft, then ───▶    signed-in operator           operators     (name + email)
+  (validated locally)  outbox, in     → re-validate (same zod)      wq_readings
+                       localStorage   → record intake (all/none)   feeding_events
                                                         │           mortality_events
                                                         └────────▶  sampling_events + fish_measurements
 ```
@@ -113,11 +113,42 @@ Removing or deactivating an operator locks them out within about a minute.
 
 `app/manifest.ts` makes the app installable (Add to Home screen) and opens it
 full-screen. `public/sw.js`, a hand-written service worker, keeps the last page that
-loaded plus its build files on the device, so the app opens with no signal and
-records can be drafted there. Saving still needs signal: a save made offline fails
-and keeps its draft. The kept page is replaced on every load with signal. It is
-first kept on the second load, because the first load comes before the worker is
-running. Test it with `next build && next start`, not `next dev`.
+loaded plus its build files on the device, so the app opens with no signal. The kept
+page is replaced on every load with signal. The first load, and a sign-in, reach the
+signed-in app without a navigation the worker sees, so in those two cases the app asks
+the worker to keep its page and build files (`useKeepForOffline`): it opens offline from
+the very first sign-in, and a normal open doesn't fetch the page twice. Test it with `next build && next start`, not `next dev`.
+
+### Saving without signal (the Outbox)
+
+Save never needs signal. It gives the Record and each of its Fish measurements an id
+(made on the device), moves it from its Draft into the Outbox (`lib/outbox.ts`, one
+localStorage key per Record) and clears the form. If storage refuses it (full or
+blocked), Save sends it straight away instead, and the Draft stays unless that works.
+The shell sends what's waiting to `POST /api/records` when the app opens or comes back
+to the foreground, when signal returns, after each Save and on "Send now", one Record
+at a time, and removes a Record only once the server answers 204. The route is a fixed
+URL rather than a server action because an action's id changes with every deploy, and
+a device can hold Records across one.
+
+- **Resends are safe.** Intake skips any row whose id is already stored, so a reply
+  lost on a weak signal never leads to a duplicate Record or Fish measurement.
+- **Who sends it.** Each Record carries the sign-in account that saved it (Clerk user
+  id, so renaming the Operator in Airtable doesn't strand it). The device sends only
+  that account's Records, and the route refuses any other (401), so nothing is ever
+  stored under someone else's name on a shared device.
+- **Sign-in.** A 401 gets one retry with a fresh Clerk token. If that fails (signed
+  out, a stale page, or Clerk never loaded because the app opened offline), the notice
+  asks to tap "Send now", which reloads the page. A 403 (no longer on the operator
+  list) asks the Operator to see their supervisor.
+- **Refused Records.** A 422 (not valid as sent, e.g. a Range tightened by a deploy
+  since the device checked it) or a server error marks that Record "needs attention"
+  with the reason, stored with it, and sending carries on with the next. It's retried
+  on every send; nothing in the app can edit or discard it yet.
+- iPhones and iPads don't run background sync for web apps, so sending happens only
+  while the app is open. The notice asks Operators to add the app to their home screen
+  when it isn't installed: Safari can clear a website's storage after 7 days without
+  a visit, while the home-screen app is counted separately.
 
 Known limits: after sign-out, the kept page can still show the previous operator until
 the next load with signal (saves are always checked against whoever is signed in).

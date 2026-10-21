@@ -10,14 +10,13 @@ import { NotesField, NumberField, RecordCard, type RecordFormProps, useRecordFor
 const NO_FISH = { weightG: "", lengthCm: "" };
 const blank = () => ({ notes: "", fish: [NO_FISH] });
 
-export function SamplingForm({ pondCode, recordedAt }: RecordFormProps) {
+export function SamplingForm(props: RecordFormProps) {
   const { form, card } = useRecordForm({
     kind: "sampling",
     schema: samplingForm,
     blank,
     savedMessage: (record) => `Sampling event saved (${record.fish.length} fish).`,
-    pondCode,
-    recordedAt,
+    ...props,
   });
   const {
     register,

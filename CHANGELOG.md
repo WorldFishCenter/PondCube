@@ -4,6 +4,21 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.5.0] - 2026-10-21
+
+### Added
+
+- Records can be saved without signal. A saved record waits on the device and is sent by itself once there's signal. The top panel shows how many records are waiting, with a "Send now" button to try straight away.
+- A waiting record the server can't accept is marked "needs attention" with the reason, so you can tell your supervisor; the others are still sent.
+- Use the app from your home screen ("Add to Home screen"), not a browser tab: a browser can clear records left waiting there. The app reminds you while records are waiting.
+
+### Fixed
+
+- Saving on a weak connection can no longer store the same record twice.
+- A record saved without signal keeps its own date and time; setting the time for the next pond no longer changes it.
+- On a shared device, records wait for the operator who made them to sign in, so they are never saved under someone else's name.
+- The app now opens without signal straight after you first sign in. Before, it had to be opened once more with signal first.
+
 ## [0.4.0] - 2026-10-20
 
 ### Added
