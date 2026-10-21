@@ -87,7 +87,7 @@ export function useOutbox(account: string, enumerator: string) {
   };
 }
 
-const records = (n: number) => `${n} ${n === 1 ? "record" : "records"}`;
+export const records = (n: number) => `${n} ${n === 1 ? "record" : "records"}`;
 const WHY_NOT_SENT: Record<Stopped, string> = {
   offline: "Kept on this device and sent automatically when there's signal.",
   signedOut: "Your sign-in needs renewing: tap Send now to reload the app.",
@@ -98,7 +98,6 @@ const WHY_NOT_SENT: Record<Stopped, string> = {
 export function OutboxAlert({ outbox, className }: { outbox: Outbox; className?: string }) {
   const { mine, others, sending, stopped, flush } = outbox;
   if (!mine.length && !others.length) return null;
-  const installed = matchMedia("(display-mode: standalone)").matches; // client only: nothing waits before hydration
 
   return (
     // Wider action slot than the stock pr-18, so "Send now" fits at the 44px touch size.
@@ -120,7 +119,6 @@ export function OutboxAlert({ outbox, className }: { outbox: Outbox; className?:
             in on this device.
           </p>
         )}
-        {!installed && <p>Add the app to your home screen, so the browser can&apos;t clear records waiting here.</p>}
       </AlertDescription>
       {mine.length > 0 && (
         <AlertAction>

@@ -19,6 +19,12 @@ export type Stopped = "offline" | Exclude<Access, object>;
 
 const PREFIX = "pondcube:outbox:";
 
+/** Every Record waiting on this device, whoever saved it. */
+export const waitingRecords = (storage: KeyValueStorage = browserStorage): WaitingRecord[] =>
+  attempt(() => storage.keys(), [])
+    .filter((key) => key.startsWith(PREFIX))
+    .flatMap((key) => attempt(() => [JSON.parse(storage.getItem(key) ?? "") as WaitingRecord], []));
+
 /** `send` posts one Record: to app/api/records in the app, to a fake in scripts/check-outbox.ts. */
 export function createOutbox(
   send: (waiting: WaitingRecord) => Promise<Sent>,
@@ -26,10 +32,7 @@ export function createOutbox(
 ) {
   let inFlight: Promise<Stopped | undefined> | undefined;
 
-  const all = (): WaitingRecord[] =>
-    attempt(() => storage.keys(), [])
-      .filter((key) => key.startsWith(PREFIX))
-      .flatMap((key) => attempt(() => [JSON.parse(storage.getItem(key) ?? "") as WaitingRecord], []));
+  const all = () => waitingRecords(storage);
   const put = (waiting: WaitingRecord) => writeLocal(PREFIX + waiting.record.id, JSON.stringify(waiting), storage);
 
   async function sendAll(account: string): Promise<Stopped | undefined> {

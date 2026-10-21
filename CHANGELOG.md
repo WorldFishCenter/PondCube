@@ -4,6 +4,17 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.6.0] - 2026-10-21
+
+### Added
+
+- On a phone or tablet, the app now shows once, as it opens, how to add it to your home screen, with a single Install button where the browser allows it. "Install the app" at the bottom of the screen brings it back.
+- On iPhone and iPad it first asks you to send any records waiting to send: the app on your home screen can't see them.
+
+### Changed
+
+- The waiting-to-send box no longer suggests adding the app to your home screen: on iPhone that could leave waiting records behind.
+
 ## [0.5.0] - 2026-10-21
 
 ### Added

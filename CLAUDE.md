@@ -48,6 +48,8 @@ components/service-worker.tsx   Registers public/sw.js; useKeepForOffline() = ke
 components/ui/*            Stock shadcn components (Base UI). Do NOT edit by hand.
 components/theme-provider.tsx, theme-toggle.tsx   shadcn dark mode (next-themes); one-tap light↔dark switch
 components/pondcube-logo.tsx   Logo mark for in-app use (same artwork as app/icon.svg)
+components/install-prompt.tsx  "Install the app" link + drawer (opens itself once, on load, on a first visit in a phone
+                          browser): install steps per platform; one-tap Install where the browser offers it. In app/page.tsx
 components/collection/*    App UI: shell (who/where/when panel, record kinds → tabs), not-on-list card, pond picker,
                           the 4 forms, feedback sheet (Airtable form); record-form.tsx = shared form hook (draft, save) + fields;
                           outbox.tsx = sending to app/api/records + the "waiting to send" notice

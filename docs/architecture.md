@@ -119,6 +119,19 @@ signed-in app without a navigation the worker sees, so in those two cases the ap
 the worker to keep its page and build files (`useKeepForOffline`): it opens offline from
 the very first sign-in, and a normal open doesn't fetch the page twice. Test it with `next build && next start`, not `next dev`.
 
+In a phone or tablet browser (not the installed app, not a computer),
+`components/install-prompt.tsx` shows how to install: a drawer that opens by itself once,
+as the first visit loads (never mid-task), and an "Install the app" link that reopens it.
+`app/page.tsx` mounts it once, inside the Suspense boundary, so the drawer hydrates with
+the page it covers and isn't remounted by a sign-in. It shows steps that work in any browser, starting with
+"open it in Safari/Chrome" for a link opened inside another app. Where the browser offers
+to install (`beforeinstallprompt`: Chrome/Edge on Android; it never fires once installed),
+the steps become a one-tap Install button. Next's PWA guide advises against relying on
+that event since it isn't cross-browser; here it's only a shortcut on top of the steps.
+Until the drawer has been seen, it also holds back Chrome's own install bar. iPhone/iPad
+steps end with signing in from the home screen, as that app doesn't share Safari's
+storage: for the same reason the drawer warns about Records waiting in the Outbox.
+
 ### Saving without signal (the Outbox)
 
 Save never needs signal. It gives the Record and each of its Fish measurements an id
@@ -146,9 +159,9 @@ a device can hold Records across one.
   with the reason, stored with it, and sending carries on with the next. It's retried
   on every send; nothing in the app can edit or discard it yet.
 - iPhones and iPads don't run background sync for web apps, so sending happens only
-  while the app is open. The notice asks Operators to add the app to their home screen
-  when it isn't installed: Safari can clear a website's storage after 7 days without
-  a visit, while the home-screen app is counted separately.
+  while the app is open. Safari can clear a website's storage after 7 days without a
+  visit, while the home-screen app is counted separately; installing protects later
+  Records, not those already waiting in Safari (the install drawer says to send them first).
 
 Known limits: after sign-out, the kept page can still show the previous operator until
 the next load with signal (saves are always checked against whoever is signed in).
