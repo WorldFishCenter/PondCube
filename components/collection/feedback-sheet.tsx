@@ -3,7 +3,7 @@
 import { WifiOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 
 // Airtable form on the `feedback` table; operator (an Airtable operator name) and app version are prefilled and hidden.
@@ -21,8 +21,10 @@ export function FeedbackSheet({ operator, version }: { operator: string; version
     <Sheet disablePointerDismissal>
       <SheetTrigger render={<Button variant="link" className="self-center" />}>Send feedback</SheetTrigger>
       <SheetContent side="bottom" className="data-[side=bottom]:h-[90svh]">
-        {/* The form shows its own title; this one is for screen readers. */}
-        <SheetTitle className="sr-only">Send feedback</SheetTitle>
+        {/* The close button sits in this strip, on the app's colours, not over the (always white) form. */}
+        <SheetHeader>
+          <SheetTitle>Send feedback</SheetTitle>
+        </SheetHeader>
         <FeedbackForm src={src} />
       </SheetContent>
     </Sheet>

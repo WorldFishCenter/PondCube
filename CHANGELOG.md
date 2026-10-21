@@ -18,6 +18,7 @@ features the second, fixes the third.
 - A record saved without signal keeps its own date and time; setting the time for the next pond no longer changes it.
 - On a shared device, records wait for the operator who made them to sign in, so they are never saved under someone else's name.
 - The app now opens without signal straight after you first sign in. Before, it had to be opened once more with signal first.
+- The feedback form's close button is now easy to see, in a strip at the top. In dark mode it was almost invisible.
 
 ## [0.4.0] - 2026-10-20
 
