@@ -106,6 +106,18 @@ Each Operator signs in with their own Clerk account (app "PondCube"). A device g
 in when the account's verified primary email matches an active operator; that
 operator's name becomes the Enumerator of every record saved, whatever the device
 sends. Emails are edited in Airtable (`email` column on `operators`) and synced.
+Signing in is one flow for everyone (`<SignIn withSignUp />`): an email, then a code
+sent to it; a new email gets its account in the same flow. There's no sign-up page and
+no password. `withSignUp` is set explicitly so a leftover `NEXT_PUBLIC_CLERK_SIGN_UP_URL`
+can't bring a separate sign-up step back. Clerk Dashboard settings, on both instances:
+
+- Email: Sign-up with email on, Verify at sign-up by email code; Sign-in with email by
+  email code. Password off.
+- No other sign-up fields (first/last name, username, phone, legal consent), else a
+  first-time Operator gets an extra "Create your account" form. Names come from Airtable.
+- Sessions: an Operator types a new code only when the session ends (Clerk's maximum
+  lifetime, 7 days by default, under Sessions); renewing it needs signal and their mailbox.
+
 Anyone can create an account, but one whose email isn't on the list can't record.
 Removing or deactivating an operator locks them out within about a minute.
 
@@ -211,7 +223,7 @@ npm run dev         # http://localhost:3000
    - `DATABASE_URL` — Production → Neon `main` pooled URL; Preview → Neon `dev`.
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Production → the
      Clerk production instance (`npx clerk@latest deploy`); Preview → development keys.
-   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`.
+   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`; remove `NEXT_PUBLIC_CLERK_SIGN_UP_URL` if present.
 3. Apply the schema to production once:
    ```bash
    DATABASE_URL="<main branch url>" npx drizzle-kit push

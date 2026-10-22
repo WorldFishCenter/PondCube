@@ -38,7 +38,7 @@ Run `npm run check`, `npm run typecheck` and `npm run format:check` before commi
 ```
 app/page.tsx              Signed-in operator check per request (Suspense), then cached ponds
 app/layout.tsx            Inter font (shadcn preset), viewport, ClerkProvider (shadcn theme), ThemeProvider
-app/sign-in, app/sign-up  Clerk's sign-in / sign-up pages; proxy.ts = clerkMiddleware (routes stay public)
+app/sign-in               Clerk's sign-in page (sign-in-or-up, no sign-up page); proxy.ts = clerkMiddleware (routes stay public)
 app/api/records/route.ts  Where the Outbox sends each Record (POST); Enumerator = signed-in operator
 app/globals.css           shadcn theme tokens (incl. --logo-outline) + 44px touch-target rule
 app/icon.svg              Favicon (outline follows OS theme); apple-icon.png = iOS home screen

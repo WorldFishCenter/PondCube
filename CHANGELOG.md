@@ -4,6 +4,13 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.7.0] - 2026-10-22
+
+### Changed
+
+- Signing in is now the same for everyone: enter your email, then the code sent to it. There's no separate sign-up and no password; if you used one before, use the emailed code instead.
+- If your email isn't on the operator list, the app now shows which email you signed in with, so you know what to ask your supervisor to add.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added

@@ -15,7 +15,11 @@ async function App() {
     return (
       <Shell>
         {/* Hash routing keeps every sign-in step on this page. */}
-        <SignIn routing="hash" appearance={{ elements: { rootBox: "w-full", cardBox: "w-full max-w-none" } }} />
+        <SignIn
+          routing="hash"
+          withSignUp
+          appearance={{ elements: { rootBox: "w-full", cardBox: "w-full max-w-none" } }}
+        />
       </Shell>
     );
   if (access === "notOnList")
