@@ -19,7 +19,7 @@ import { OutboxAlert, useOutbox } from "./outbox";
 import { PondCombobox, type Pond } from "./pond-combobox";
 import { RecordedAtField, type RecordFormProps } from "./record-form";
 import { WaterQualityForm } from "./water-quality-form";
-import { FeedingForm } from "./feeding-form";
+import { FeedingForm, type Feed } from "./feeding-form";
 import { MortalityForm } from "./mortality-form";
 import { SamplingForm } from "./sampling-form";
 
@@ -27,13 +27,13 @@ const POND_KEY = "pondcube:lastPond";
 const RECORDED_AT_KEY = "pondcube:recordedAt"; // kept so a refresh mid-record doesn't lose it
 
 // One tab per Record kind (lib/validation.ts RECORD_KINDS; the compiler flags a missing one), in tab
-// order. Each form owns its fields and its kind's draft.
+// order. Each form owns its fields and its kind's draft; only the Feeding form uses `feeds`.
 const TABS = {
   wq: { label: "Water", Form: WaterQualityForm },
   feeding: { label: "Feeding", Form: FeedingForm },
   mortality: { label: "Mortality", Form: MortalityForm },
   sampling: { label: "Sampling", Form: SamplingForm },
-} satisfies Record<RecordKind, { label: string; Form: React.ComponentType<RecordFormProps> }>;
+} satisfies Record<RecordKind, { label: string; Form: React.ComponentType<RecordFormProps & { feeds: Feed[] }> }>;
 
 // The selected record kind is filled with the primary colour. Stock Tabs has no filled variant,
 // so this is shadcn's className step with semantic tokens; the dark: ones beat the stock dark style.
@@ -71,22 +71,26 @@ export function CollectionSkeleton() {
   );
 }
 
-// The person recording is the "enumerator" (schema term): the signed-in Operator, matched on the server.
+// The Person (schema term) is the signed-in Operator who records, matched on the server.
 export function CollectionApp({
-  enumerator,
+  person,
   account,
   ponds,
+  feeds,
   version,
 }: {
-  enumerator: string;
+  person: string;
   account: string;
   ponds: Pond[];
+  feeds: (Feed & { sites: string[] })[];
   version: string;
 }) {
   const [pondCode, setPondCode] = React.useState("");
+  const site = ponds.find((p) => p.pondCode === pondCode)?.site;
+  const feedsHere = feeds.filter((f) => site && f.sites.includes(site)); // the chosen pond's site's feeds
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);
-  const outbox = useOutbox(account, enumerator);
+  const outbox = useOutbox(account, person);
 
   // Restore after hydration (server has no localStorage), so setState-in-effect is intended.
   React.useEffect(() => {
@@ -120,11 +124,11 @@ export function CollectionApp({
         <CardContent>
           <FieldGroup className="grid gap-4 md:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor="operator">Operator</FieldLabel>
-              <Input id="operator" value={enumerator} readOnly />
+              <FieldLabel htmlFor="operator">Person</FieldLabel>
+              <Input id="operator" value={person} readOnly />
             </Field>
             <Field>
-              <FieldLabel htmlFor="pond">Pond / tank</FieldLabel>
+              <FieldLabel htmlFor="pond">Pond</FieldLabel>
               <PondCombobox id="pond" ponds={ponds} value={pondCode} onChange={choosePond} />
             </Field>
             <div className="md:col-span-2">
@@ -158,12 +162,12 @@ export function CollectionApp({
           {Object.entries(TABS).map(([kind, { Form }]) => (
             // Keyed by pond: switching ponds remounts the form with that pond's draft.
             <TabsContent key={kind} value={kind}>
-              <Form key={pondCode} pondCode={pondCode} recordedAt={when} outbox={outbox} />
+              <Form key={pondCode} pondCode={pondCode} recordedAt={when} outbox={outbox} feeds={feedsHere} />
             </TabsContent>
           ))}
         </Tabs>
       )}
-      <FeedbackSheet operator={enumerator} version={version} />
+      <FeedbackSheet operator={person} version={version} />
     </Shell>
   );
 }

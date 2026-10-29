@@ -4,6 +4,14 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.8.0] - 2026-10-29
+
+### Changed
+
+- The app now follows WorldFish's shared data standard for its breeding programmes, so its records line up with those of the other sites. You'll see it in the field names (Person, Pond, Cause of death, Total weight, Standard length, Feed), in the four causes of death (Cull, Unknown, Disease_parasites, Water_quality), and in sampling, where the length to measure is now the standard length: from the tip of the snout to where the tail fin starts.
+- Ready for more sites: you see and record only the ponds of your own site (or sites), and each site has its own feed list, which replaces Pellet, Mash and Other.
+- Records waiting to send and half-filled forms from before this update carry over. A feed type or cause of death that's no longer offered is kept in the remarks or note.
+
 ## [0.7.0] - 2026-10-22
 
 ### Changed

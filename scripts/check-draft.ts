@@ -22,8 +22,8 @@ async function main() {
   // Edits are kept and restore; another pond's slot stays empty.
   const store = memory();
   const outbox = fakeKeep();
-  const pondA = createDraft<Values>(draftKey("wq", "A"), outbox.keep, store);
-  const pondB = createDraft<Values>(draftKey("wq", "B"), outbox.keep, store);
+  const pondA = createDraft<Values>("wq", "A", outbox.keep, store);
+  const pondB = createDraft<Values>("wq", "B", outbox.keep, store);
   assert.equal(pondA.restore(), null);
   pondA.change({ temperature: "28" });
   assert.deepEqual(pondA.restore(), { temperature: "28" });
@@ -46,7 +46,7 @@ async function main() {
   assert.deepEqual(pondA.restore(), { temperature: "28" });
 
   // Neither in the Outbox nor on the server (no room on the device, no signal): the Draft stays.
-  const nowhere = createDraft<Values>(draftKey("wq", "A"), fakeKeep(false).keep, store);
+  const nowhere = createDraft<Values>("wq", "A", fakeKeep(false).keep, store);
   assert.equal(await nowhere.submit({ temperature: "28" }, AT), "notKept");
   assert.deepEqual(pondA.restore(), { temperature: "28" }, "a Draft stays until its Record is safe");
 
@@ -58,13 +58,21 @@ async function main() {
   assert.equal(pondA.restore(), null, "a saved record's draft stays cleared");
 
   // Broken storage (private mode, quota, corrupt JSON) degrades to "no draft", never a crash.
-  const fragile = createDraft<Values>(draftKey("wq", "A"), outbox.keep, broken);
+  const fragile = createDraft<Values>("wq", "A", outbox.keep, broken);
   assert.equal(fragile.restore(), null);
   fragile.change({ temperature: "1" });
   assert.equal(await fragile.submit({ temperature: "1" }, AT), "kept", "saving works without storage");
   assert.equal(readLocal("x", broken), null);
   store.map.set(draftKey("wq", "C"), "{not json");
-  assert.equal(createDraft(draftKey("wq", "C"), outbox.keep, store).restore(), null);
+  assert.equal(createDraft("wq", "C", outbox.keep, store).restore(), null);
+
+  // Saved before 0.8.0: restored under the new field names.
+  store.map.set(draftKey("mortality", "A"), JSON.stringify({ mortalityCount: "3", remarks: "net" }));
+  assert.deepEqual(createDraft("mortality", "A", outbox.keep, store).restore(), {
+    mortalityCount: "3",
+    causeDeath: undefined,
+    noteDeath: "net",
+  });
 
   console.log("draft lifecycle OK");
 }

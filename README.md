@@ -23,7 +23,9 @@ PondCube Collect exists to make those observations:
 - **resilient**, so a dropped signal or a closed tab never loses a reading;
 - **connected**, so manual records sit in the same dataset as the pond registry
   and, in time, the facility's sensor data — every record tied to the pond it
-  belongs to.
+  belongs to;
+- **comparable across sites**, by using the same names, codes and limits as
+  WorldFish's breeding programmes, so records from different sites line up.
 
 ## What it does
 
@@ -34,17 +36,19 @@ The four kinds of observation:
 
 - **Water quality** — dissolved oxygen and temperature, plus pH, ammonia, nitrite
   and nitrate when taken, logged for the morning or afternoon round.
-- **Feeding** — how much feed went into the pond, with feed type and number of
-  feedings.
-- **Mortality** — how many fish were removed dead, and the suspected cause.
-- **Sampling** — a batch of individual fish weights and lengths, captured together
-  as one sampling event.
+- **Feeding** — how much feed went into the pond, with the feed used (from the
+  site's own list) and number of feedings.
+- **Mortality** — how many fish were removed dead, and the cause of death.
+- **Sampling** — a batch of individual fish weights and standard lengths, captured
+  together as one sampling event.
 
 ## What makes it fit the field
 
-- **Every pond, found fast.** All 296 coded ponds across the site — earthen ponds,
-  fish tanks, hatchery and storage tanks — are searchable from one picker, so the
-  right pond is two taps away.
+- **Every pond at your site, found fast.** Each person sees the ponds of their own
+  site — at Penang, 296 coded earthen ponds, fish tanks, hatchery and storage
+  tanks — searchable from one picker, so the right pond is two taps away.
+- **Ready for more sites.** Each site keeps its own ponds, people and feed list, so
+  another WorldFish site can start using the app without changing it.
 - **Built for a phone at the pondside.** Large touch targets, a layout that works
   one-handed, and no fiddly controls.
 - **One sign-in, then out of the way.** Each operator signs in once on their device
@@ -65,8 +69,9 @@ The four kinds of observation:
 ## Where the data goes
 
 Records are written to a single aquaculture database for the facility, hosted close
-to Penang. The pond registry is maintained in Airtable as the human-friendly place
-to add and edit ponds, and flows from there into the collection database. Sensor
+to Penang. The lists the app relies on — sites, ponds, people, species and feeds —
+are kept in Airtable, the human-friendly place to edit them, and flow from there
+into the collection database. Sensor
 data from the facility is planned to join the same database, meeting the manual
 records pond-by-pond.
 

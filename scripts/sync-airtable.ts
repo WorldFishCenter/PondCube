@@ -3,22 +3,32 @@ import { neon } from "@neondatabase/serverless";
 import { and, eq, getTableColumns, isNotNull, ne, notInArray, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { drizzle } from "drizzle-orm/neon-http";
-import type { PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
+import type { PgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { normaliseEmail } from "../lib/operators";
-import { assets, operators } from "../lib/schema";
+import { feed, pond, operators, site, species } from "../lib/schema";
 
-// Airtable is where people edit ponds and operators; this copies both one way into Neon.
+// Airtable is where people edit sites, species, feeds, ponds and operators; this copies them one way into Neon.
 // Every row is checked first and nothing is written unless all pass. The write is all-or-nothing:
-// upsert, then retire ponds / deactivate operators no longer in Airtable. Nothing is deleted,
-// since records reference both. Usage: npm run db:sync [-- --prod]  (or db:sync-ponds / -operators)
+// upsert, then retire ponds / feeds / deactivate operators no longer in Airtable. Nothing is deleted,
+// since records reference them. Usage: npm run db:sync [-- --prod]  (or db:sync-ponds / -operators)
 const BASE_ID = "appPU5BJLdsjbn49o"; // PondCube base
 
 type Fields = Record<string, unknown>;
-export type AirtableRows = { ponds?: Fields[]; operators?: Fields[] };
-type Pond = typeof assets.$inferInsert;
+/** Each row carries its Airtable record `id`: ponds, operators and feeds link to sites and species by it. */
+export type AirtableRows = {
+  sites?: Fields[];
+  species?: Fields[];
+  feeds?: Fields[];
+  ponds?: Fields[];
+  operators?: Fields[];
+};
+type Site = typeof site.$inferInsert;
+type Species = typeof species.$inferInsert;
+type Feed = typeof feed.$inferInsert;
+type Pond = typeof pond.$inferInsert;
 type Operator = typeof operators.$inferInsert;
-type SyncPlan = { ponds?: Pond[]; operators?: Operator[] };
+type SyncPlan = { sites?: Site[]; species?: Species[]; feeds?: Feed[]; ponds?: Pond[]; operators?: Operator[] };
 type Db = PgDatabase<PgQueryResultHKT>;
 
 /** The seam to the database: reads, plus one all-or-nothing write. Adapters: Neon batch (main), PGLite transaction (check-sync). */
@@ -48,75 +58,162 @@ const number = optional.pipe(z.coerce.number<string>({ error: "is not a number" 
 const wholeNumber = number.pipe(z.number().int("is not a whole number").nullable());
 const date = optional.pipe(z.iso.date({ error: "is not a date (YYYY-MM-DD)" }).nullable());
 const POND_CODE = /^[A-Z]{3}-[A-Z0-9]{3}-\d{3}$/;
+const SPECIES = /^[A-Z]{2}$/;
+const SITE = /^[A-Z]{3}$/;
+const upper = text.transform((s) => s.toUpperCase());
+const siteLinks = z.array(z.string().regex(SITE, "should link to rows of sites")).default([]);
+
+const siteRow = z
+  .object({
+    id: z.string(),
+    site: upper.pipe(z.string().regex(SITE, "should be three letters, e.g. PEN")),
+    name_site: required,
+    owner_site: optional,
+    phone_site: optional,
+    email_site: optional,
+    lat_site: number,
+    long_site: number,
+    note_site: optional,
+  })
+  .transform((r) => ({
+    id: r.id,
+    row: {
+      site: r.site,
+      nameSite: r.name_site,
+      ownerSite: r.owner_site,
+      phoneSite: r.phone_site,
+      emailSite: r.email_site,
+      latSite: r.lat_site,
+      longSite: r.long_site,
+      noteSite: r.note_site,
+    } satisfies Site,
+  }));
+
+const speciesRow = z
+  .object({
+    id: z.string(),
+    species: upper.pipe(z.string().regex(SPECIES, "should be two letters, e.g. ON")),
+    species_latin: required,
+    species_common: optional,
+  })
+  .transform((r) => ({
+    id: r.id,
+    row: { species: r.species, speciesLatin: r.species_latin, speciesCommon: r.species_common } satisfies Species,
+  }));
 
 const pondRow = z
   .object({
-    pond_code: text.transform((s) => s.toUpperCase()).pipe(z.string().regex(POND_CODE, "should look like PEN-FT3-091")),
+    pond_code: upper.pipe(z.string().regex(POND_CODE, "should look like PEN-FT3-091")),
     display_name: required,
-    site: required,
-    site_code: required,
+    site: required.pipe(z.string().regex(SITE, "should link to one row of sites")),
     area: required,
     area_code: required,
     zone: required,
     unit_type: required,
     legacy_location: optional,
     legacy_tank_id: wholeNumber,
-    latitude: number,
-    longitude: number,
+    lat_pond: number,
+    long_pond: number,
     volume_m3: number,
-    surface_area_m2: number,
+    area_pond: number,
     depth_m: number,
     water_source: optional,
-    species_strain: optional,
+    species: optional.pipe(z.string().regex(SPECIES, "should link to one row of species").nullable()),
     status: text.transform((s) => s.toLowerCase() || "active"), // the app lists only "active" ponds
     commissioned_date: date,
-    notes: optional,
+    note_pond: optional,
   })
   .transform((r): Pond => ({
     pondCode: r.pond_code,
     displayName: r.display_name,
     site: r.site,
-    siteCode: r.site_code,
     area: r.area,
     areaCode: r.area_code,
     zone: r.zone,
     unitType: r.unit_type,
     legacyLocation: r.legacy_location,
     legacyTankId: r.legacy_tank_id,
-    latitude: r.latitude,
-    longitude: r.longitude,
+    latPond: r.lat_pond,
+    longPond: r.long_pond,
     volumeM3: r.volume_m3,
-    surfaceAreaM2: r.surface_area_m2,
+    areaPond: r.area_pond,
     depthM: r.depth_m,
     waterSource: r.water_source,
-    speciesStrain: r.species_strain,
+    species: r.species,
     status: r.status,
     commissionedDate: r.commissioned_date,
-    notes: r.notes,
+    notePond: r.note_pond,
   }));
 
 const email = text
   .transform((s) => normaliseEmail(s) || null)
   .pipe(z.email({ error: "is not an email address" }).nullable());
-const operatorRow = z.object({
-  name: required,
-  email,
-  active: z.boolean({ error: "should be a checkbox" }).default(false), // unticked = omitted
-});
+const operatorRow = z
+  .object({
+    name: required,
+    email,
+    active: z.boolean({ error: "should be a checkbox" }).default(false), // unticked = omitted
+    site: siteLinks,
+  })
+  .transform(({ site, ...o }): Operator => ({ ...o, sites: site }));
+
+const feedRow = z
+  .object({
+    feed: text.pipe(z.string().length(3, "should be three characters (DMS FEED), e.g. SUP")),
+    note_feed: optional,
+    site: siteLinks,
+  })
+  .transform((r): Feed => ({ feed: r.feed, noteFeed: r.note_feed, sites: r.site }));
+
+// Links arrive as lists of record ids; unknown ones become "?" and fail their row's check.
+const resolve = (codes: Map<string, string>, v: unknown) =>
+  Array.isArray(v) ? v.map((id) => codes.get(String(id)) ?? "?") : v;
+// A field that links to one row: several links become "?" too.
+const linkOne = (codes: Map<string, string>, v: unknown) => {
+  const found = resolve(codes, v);
+  if (!Array.isArray(found)) return found;
+  return found.length > 1 ? "?" : found[0];
+};
+/** Checks a table other rows link to (its code is in field `key`); returns its rows and record id → code. */
+function checkLinked<T>(
+  table: string,
+  key: string,
+  rows: Fields[] | undefined,
+  schema: z.ZodType<{ id: string; row: T }>,
+  code: (row: T) => string,
+  problems: string[],
+) {
+  const checked = rows ? checkRows(table, key, rows, schema, (s) => code(s.row), problems) : [];
+  const codes = new Map(checked.map((s) => [s.id, code(s.row)]));
+  return { rows: rows && checked.map((s) => s.row), codes };
+}
 
 function planSync(rows: AirtableRows): { plan: SyncPlan; problems: string[] } {
   const problems: string[] = [];
-  const plan: SyncPlan = {};
+  const sites = checkLinked("sites", "site", rows.sites, siteRow, (s) => s.site, problems);
+  const species = checkLinked("species", "species", rows.species, speciesRow, (s) => s.species, problems);
+  const plan: SyncPlan = { sites: sites.rows, species: species.rows };
+  const linkSites = (rows: Fields[]) =>
+    rows.map((r) => ("site" in r ? { ...r, site: resolve(sites.codes, r.site) } : r));
+  if (rows.feeds) plan.feeds = checkRows("feeds", "feed", linkSites(rows.feeds), feedRow, (f) => f.feed, problems);
   if (rows.ponds) {
-    plan.ponds = checkRows("ponds", "pond_code", rows.ponds, pondRow, (p) => p.pondCode, problems);
+    const ponds = rows.ponds.map((p) => ({
+      ...p,
+      ...("site" in p ? { site: linkOne(sites.codes, p.site) } : {}),
+      ...("species" in p ? { species: linkOne(species.codes, p.species) } : {}),
+    }));
+    plan.ponds = checkRows("ponds", "pond_code", ponds, pondRow, (p) => p.pondCode, problems);
     if (!plan.ponds.length) problems.push("ponds: Airtable returned none; refusing to retire every pond");
   }
   if (rows.operators) {
-    plan.operators = checkRows("operators", "name", rows.operators, operatorRow, (o) => o.name.toLowerCase(), problems);
+    const ops = linkSites(rows.operators);
+    plan.operators = checkRows("operators", "name", ops, operatorRow, (o) => o.name.toLowerCase(), problems);
     if (!plan.operators.some((o) => o.active))
       problems.push(
         "operators: none would be active (was the `active` column renamed?); refusing to empty the operator list",
       );
+    // An active operator with no site would see no ponds.
+    for (const o of plan.operators) if (o.active && !o.sites?.length) problems.push(`operators: ${o.name} has no site`);
     // One account signs in as one operator.
     const emails = new Map<string, string>();
     for (const o of plan.operators) {
@@ -139,7 +236,7 @@ function checkRows<T>(
   const ok: T[] = [];
   const seen = new Map<string, string>();
   rows.forEach((fields, i) => {
-    if (!Object.keys(fields).length) return; // Airtable's blank rows
+    if (!Object.keys(fields).some((k) => k !== "id")) return; // Airtable's blank rows (linked tables carry an id)
     const label = `${table} row ${i + 1}${fields[labelField] ? ` (${String(fields[labelField]).trim()})` : ""}`;
     const parsed = schema.safeParse(fields);
     if (!parsed.success) {
@@ -157,7 +254,7 @@ function checkRows<T>(
 async function describeSync(db: Db, plan: SyncPlan): Promise<string[]> {
   const lines: string[] = [];
   if (plan.ponds) {
-    const existing = await db.select({ code: assets.pondCode, status: assets.status }).from(assets);
+    const existing = await db.select({ code: pond.pondCode, status: pond.status }).from(pond);
     const incoming = new Set(plan.ponds.map((p) => p.pondCode));
     const known = new Set(existing.map((e) => e.code));
     const added = plan.ponds.filter((p) => !known.has(p.pondCode)).length;
@@ -177,23 +274,51 @@ async function describeSync(db: Db, plan: SyncPlan): Promise<string[]> {
       `Operators: ${plan.operators.length} in Airtable (${active} active) → ${added} new, ${gone.length} deactivated${gone.length ? ` (${gone.join(", ")})` : ""}`,
     );
   }
+  // Tables that are only upserted: how many rows are new.
+  const upserted = async <T>(
+    label: string,
+    table: PgTable,
+    code: PgColumn,
+    rows: T[] | undefined,
+    key: (r: T) => string,
+  ) => {
+    if (!rows) return;
+    const known = new Set((await db.select({ code }).from(table)).map((k) => k.code));
+    const added = rows.filter((r) => !known.has(key(r))).length;
+    lines.push(`${label}: ${rows.length} in Airtable → ${added} new, ${rows.length - added} updated`);
+  };
+  await upserted("Sites", site, site.site, plan.sites, (s) => s.site);
+  await upserted("Species", species, species.species, plan.species, (s) => s.species);
+  await upserted("Feeds", feed, feed.feed, plan.feeds, (f) => f.feed);
   return lines;
 }
 
 function syncQueries(db: Db, plan: SyncPlan): BatchItem<"pg">[] {
   const queries: BatchItem<"pg">[] = [];
+  // Insert each row, or update the one with the same `key`.
+  const upsert = (table: PgTable, key: PgColumn, rows: object[]) =>
+    db
+      .insert(table)
+      .values(rows)
+      .onConflictDoUpdate({ target: key, set: excluded(table, rows[0]) });
+  // Before ponds and operators, which reference them. Never removed: ponds and records keep them.
+  if (plan.sites?.length) queries.push(upsert(site, site.site, plan.sites));
+  if (plan.species?.length) queries.push(upsert(species, species.species, plan.species));
+  if (plan.feeds) {
+    if (plan.feeds.length) queries.push(upsert(feed, feed.feed, plan.feeds));
+    // Removed from Airtable: offered nowhere, kept for the records that reference it.
+    const codes = plan.feeds.map((f) => f.feed);
+    queries.push(db.update(feed).set({ sites: [] }).where(notInArray(feed.feed, codes)));
+  }
   if (plan.ponds) {
     const codes = plan.ponds.map((p) => p.pondCode);
     queries.push(
-      db
-        .insert(assets)
-        .values(plan.ponds)
-        .onConflictDoUpdate({ target: assets.pondCode, set: excluded(assets, plan.ponds[0]) }),
+      upsert(pond, pond.pondCode, plan.ponds),
       // Removed from Airtable: hidden from the app, kept for the records that reference it.
       db
-        .update(assets)
+        .update(pond)
         .set({ status: "retired" })
-        .where(and(notInArray(assets.pondCode, codes), ne(assets.status, "retired"))),
+        .where(and(notInArray(pond.pondCode, codes), ne(pond.status, "retired"))),
     );
   }
   if (plan.operators) {
@@ -201,10 +326,7 @@ function syncQueries(db: Db, plan: SyncPlan): BatchItem<"pg">[] {
     queries.push(
       // Emails move between operators (a rename, a hand-over): free them all; the upsert sets them again.
       db.update(operators).set({ email: null }).where(isNotNull(operators.email)),
-      db
-        .insert(operators)
-        .values(plan.operators)
-        .onConflictDoUpdate({ target: operators.name, set: excluded(operators, plan.operators[0]) }),
+      upsert(operators, operators.name, plan.operators),
       // Removed or renamed in Airtable: can no longer sign in; past records keep the name.
       db
         .update(operators)
@@ -221,6 +343,7 @@ const excluded = (table: PgTable, row: object) => {
   return Object.fromEntries(Object.keys(row).map((k) => [k, sql.raw(`excluded."${cols[k].name}"`)]));
 };
 
+/** Each row's fields, plus its record `id`. */
 async function fetchTable(table: string): Promise<Fields[]> {
   const key = process.env.AIRTABLE_API_KEY;
   if (!key) throw new Error("AIRTABLE_API_KEY not set");
@@ -232,8 +355,8 @@ async function fetchTable(table: string): Promise<Fields[]> {
     if (offset) url.searchParams.set("offset", offset);
     const res = await fetch(url, { headers: { Authorization: `Bearer ${key}` } });
     if (!res.ok) throw new Error(`Airtable ${table}: ${res.status} ${await res.text()}`);
-    const page = (await res.json()) as { records: { fields: Fields }[]; offset?: string };
-    rows.push(...page.records.map((r) => r.fields));
+    const page = (await res.json()) as { records: { id: string; fields: Fields }[]; offset?: string };
+    rows.push(...page.records.map((r) => ({ ...r.fields, id: r.id })));
     offset = page.offset;
   } while (offset);
   return rows;
@@ -265,11 +388,14 @@ async function main() {
     throw new Error(`Unknown table "${only}". Use: ponds, operators`);
 
   const target = neonTarget(prod);
-  const [ponds, ops] = await Promise.all([
+  const [siteRows, speciesRows, feeds, ponds, ops] = await Promise.all([
+    fetchTable("sites"), // ponds, operators and feeds link to sites
+    only === "operators" ? undefined : fetchTable("species"),
+    only ? undefined : fetchTable("feeds"),
     only === "operators" ? undefined : fetchTable("ponds"),
     only === "ponds" ? undefined : fetchTable("operators"),
   ]);
-  const sync = await prepareSync({ ponds, operators: ops }, target);
+  const sync = await prepareSync({ sites: siteRows, species: speciesRows, feeds, ponds, operators: ops }, target);
   if ("problems" in sync)
     throw new Error(`Nothing written. Fix these in Airtable, then re-run:\n- ${sync.problems.join("\n- ")}`);
   console.log(sync.summary.join("\n"));

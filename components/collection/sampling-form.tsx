@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FieldDescription, FieldError, FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field";
 import { NotesField, NumberField, RecordCard, type RecordFormProps, useRecordForm } from "./record-form";
 
-const NO_FISH = { weightG: "", lengthCm: "" };
+const NO_FISH = { wt: "", lenSt: "" };
 const blank = () => ({ notes: "", fish: [NO_FISH] });
 
 export function SamplingForm(props: RecordFormProps) {
@@ -45,15 +45,15 @@ export function SamplingForm(props: RecordFormProps) {
             <FieldGroup key={f.id} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
               <NumberField
                 id={`w-${i}`}
-                label={`#${i + 1} weight (g)`}
-                error={errors.fish?.[i]?.weightG}
-                {...register(`fish.${i}.weightG`)}
+                label={`#${i + 1} total weight (g)`}
+                error={errors.fish?.[i]?.wt}
+                {...register(`fish.${i}.wt`)}
               />
               <NumberField
                 id={`l-${i}`}
-                label="Length (cm)"
-                error={errors.fish?.[i]?.lengthCm}
-                {...register(`fish.${i}.lengthCm`)}
+                label="Standard length (cm)"
+                error={errors.fish?.[i]?.lenSt}
+                {...register(`fish.${i}.lenSt`)}
               />
               <Button
                 type="button"

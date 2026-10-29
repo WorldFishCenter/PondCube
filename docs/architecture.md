@@ -9,12 +9,12 @@ infrastructure and roadmap decisions; day-to-day coding rules are in
 Operators sign in on a phone or tablet, pick which pond they're at, and record one
 of four kinds of observation. Each record is validated on the device, re-validated
 on the server, and written whole (or not at all) to a Postgres database. Each
-Operator has their own Clerk account; the server names the Enumerator from it.
+Operator has their own Clerk account; the server names the Person from it.
 
 ```
 device (phone/tablet)                 server (Vercel, sin1)        data (Neon Postgres, Singapore)
 ─────────────────────                 ─────────────────────        ──────────────────────────────
-sign in, pick pond                    POST /api/records:           assets        (ponds, static)
+sign in, pick pond                    POST /api/records:           pond          (static)
 fill a record  ── draft, then ───▶    signed-in operator           operators     (name + email)
   (validated locally)  outbox, in     → re-validate (same zod)      wq_readings
                        localStorage   → record intake (all/none)   feeding_events
@@ -24,14 +24,25 @@ fill a record  ── draft, then ───▶    signed-in operator           o
 
 ## Data model
 
-Two static dimension tables and five event tables, all keyed on `pond_code`.
+Five static dimension tables and five event tables, all keyed on `pond_code`.
 Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 
-- **`assets`** — one row per Pond. Mirrors the Airtable asset table (see below).
-  Carries `legacy_location` + `legacy_tank_id` so converted historical rows map
-  onto today's pond codes.
-- **`operators`** — the people who record, with the email each signs in with. The
-  signed-in operator's name is attached to each record as its `enumerator`.
+- **`site`** — one row per site (WorldFish DMS v3 `SITE`: three-letter `site` code, `name_site`,
+  owner, contact, position), mirroring the Airtable `sites` table. Never removed from Neon.
+- **`pond`** — one row per Pond. Mirrors the Airtable `ponds` table (see below). Where the
+  WorldFish DMS v3 names a field, the column (and the Airtable field) uses that name: `site`,
+  `lat_pond`, `long_pond`, `area_pond` (hectares), `note_pond` (see `docs/naming-alignment.md`).
+  Carries `legacy_location` + `legacy_tank_id` so converted historical rows map onto today's pond
+  codes. Its `site` points to a row of `site`, its `species` to a row of `species`.
+- **`feed`** — the DMS feed list (`feed`, three characters; `note_feed`) with the `sites` that use
+  it, mirroring the Airtable `feeds` table. A Feeding event's `feed` points to one; the form offers
+  the feeds of the chosen pond's site, and the records route refuses any other.
+- **`species`** — the DMS species list (`species` two-letter code, `species_latin`, `species_common`),
+  mirroring the Airtable `species` table. In Airtable a pond's species is a link to that table; the
+  sync turns the link into the code. Never removed from Neon.
+- **`operators`** — the people who record, with the email each signs in with and the `sites`
+  (one or more codes) whose ponds they see and record. The signed-in operator's name is attached
+  to each record as its `person`.
 - **`wq_readings`, `feeding_events`, `mortality_events`** — flat event tables.
 - **`app_version`** on every record table (fish measurements inherit it from their sampling
   event): the app version that saved it, set on the server by record intake, or `legacy` for the
@@ -49,24 +60,29 @@ later (see roadmap). Region: **Singapore / ap-southeast-1**, closest to Penang H
 
 Two branches give clean dev/prod separation on identical schema:
 
-| Environment       | Neon branch | `DATABASE_URL` set in       |
-| ----------------- | ----------- | --------------------------- |
-| Local dev         | `dev`       | your `.env`                 |
-| Vercel Preview    | `dev`       | Vercel "Preview" env var    |
-| Vercel Production | `main`      | Vercel "Production" env var |
+| Environment       | Neon branch  | `DATABASE_URL` set in       |
+| ----------------- | ------------ | --------------------------- |
+| Local dev         | `dev`        | your `.env`                 |
+| Vercel Preview    | `dev`        | Vercel "Preview" env var    |
+| Vercel Production | `production` | Vercel "Production" env var |
 
-`main` is production; `dev` is a copy-on-write branch with isolated data, so test
+`production` is the default (production) branch; `dev` is a copy-on-write branch with isolated data, so test
 records never touch production. Schema is applied per branch with
-`npm run db:push`. Always use the **pooled** connection string.
+`npm run db:push`. Always use the **pooled** connection string. A rename goes as explicit
+`ALTER … RENAME` SQL on each branch instead (e.g. `scripts/migrate-0.8.0.sql`): push can't tell a rename
+from a drop plus an add.
 
 ### Airtable — the human editing surface for ponds and operators
 
 The Airtable base **PondCube** is where people add and edit ponds (`ponds` table) and
 operators (`operators` table: `name`, `email`, `active`, `notes`) by hand. Neon is the system
 of record the app reads and writes. The flow is one-way:
-**Airtable → `npm run db:sync` → Neon `assets` / `operators`** (or one table:
-`db:sync-ponds`, `db:sync-operators`). It upserts, so re-run it after edits. Never edit
-ponds or operators directly in Neon.
+**Airtable → `npm run db:sync` → Neon `site` / `species` / `feed` / `pond` / `operators`** (or
+`db:sync-ponds`, which brings species with it, and `db:sync-operators`; sites come with both).
+Ponds and operators link to `sites`, ponds to `species`: the sync turns each link into the code,
+and stops if a link points nowhere or an active operator has no site. It upserts, so re-run it
+after edits. Never edit ponds or operators directly in Neon. Feeds removed from Airtable stay in Neon
+for the Records that use them, but are offered nowhere.
 
 - **Checked first, all-or-nothing.** Every Airtable row is checked (required columns,
   numbers, dates, pond code format, duplicates) before anything is written; any problem
@@ -88,7 +104,7 @@ Water-quality readings from before the app (the paper/Excel log, July 2025) are 
 `npm run db:import-legacy -- <pondcube_observations_wide.csv>` (then `-- --prod`). The CSV comes from
 `convert_pondcube.py` next to the repo, which also documents the source in `pondcube_DATA_DICTIONARY.md`.
 Each old tank maps to its Pond through `legacy_location` + `legacy_tank_id`. The log has no times or
-names, so morning = 08:00 and afternoon = 14:00 Penang time, and the Enumerator is Mahirah Mahmuddin.
+names, so morning = 08:00 and afternoon = 14:00 Penang time, and the Person is Mahirah Mahmuddin.
 It deliberately bypasses record intake: readings without dissolved oxygen or temperature are kept with
 blanks, and two out-of-range temperatures (114.0 and 59.3 °C, Fish Tank 3) are kept as recorded. All
 of this is listed in the script's header. Re-running is safe: readings have fixed ids.
@@ -104,7 +120,7 @@ to environments automatically, including a DB branch per preview deploy.
 
 Each Operator signs in with their own Clerk account (app "PondCube"). A device gets
 in when the account's verified primary email matches an active operator; that
-operator's name becomes the Enumerator of every record saved, whatever the device
+operator's name becomes the Person of every record saved, whatever the device
 sends. Emails are edited in Airtable (`email` column on `operators`) and synced.
 Signing in is one flow for everyone (`<SignIn withSignUp />`): an email, then a code
 sent to it; a new email gets its account in the same flow. There's no sign-up page and
@@ -120,6 +136,10 @@ can't bring a separate sign-up step back. Clerk Dashboard settings, on both inst
 
 Anyone can create an account, but one whose email isn't on the list can't record.
 Removing or deactivating an operator locks them out within about a minute.
+
+An Operator sees and records only the ponds of their own sites (`sites` on `operators`, from the
+`site` links in Airtable); some people have several. The page lists only those ponds, and the
+records route refuses a Record for any other pond with a 422, so it shows as "needs attention".
 
 ### Installable app (PWA)
 
@@ -200,8 +220,8 @@ fetches components).
 
 ### First run (against the DEV branch)
 
-1. Create the Neon project in **Singapore / ap-southeast-1**. `main` is production.
-2. Create a `dev` branch from `main`.
+1. Create the Neon project in **Singapore / ap-southeast-1**. The default branch, named `production`, is production.
+2. Create a `dev` branch from `production`.
 3. Copy the **pooled** connection strings for each branch.
 
 ```bash
@@ -212,20 +232,27 @@ cp .env.example .env
 
 npm install
 npm run db:push     # create tables in the dev branch
-npm run db:sync     # copy ponds + operators from Airtable
+npm run db:sync     # copy sites, species, feeds, ponds + operators from Airtable
 npm run dev         # http://localhost:3000
 ```
 
-### Deploy (production = `main` branch)
+### Deploy (production)
 
 1. Push the repo to GitHub; **Import** it in Vercel.
 2. Set env vars per environment:
-   - `DATABASE_URL` — Production → Neon `main` pooled URL; Preview → Neon `dev`.
+   - `DATABASE_URL` — Production → Neon `production` pooled URL; Preview → Neon `dev`.
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Production → the
      Clerk production instance (`npx clerk@latest deploy`); Preview → development keys.
    - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`; remove `NEXT_PUBLIC_CLERK_SIGN_UP_URL` if present.
 3. Apply the schema to production once:
    ```bash
-   DATABASE_URL="<main branch url>" npx drizzle-kit push
+   DATABASE_URL="<production branch url>" npx drizzle-kit push
    npm run db:sync -- --prod   # needs DATABASE_URL_PROD in .env
+   ```
+4. Production still at 0.7.0: before deploying 0.8.0, run its renames instead of push, when no one is
+   recording (0.7.0 stops working once they're applied). They keep every Record value; tested in-memory
+   against the 0.7.0 schema.
+   ```bash
+   psql "$DATABASE_URL_PROD" -f scripts/migrate-0.8.0.sql
+   npm run db:sync -- --prod   # sets the new sites, species, feeds and links
    ```

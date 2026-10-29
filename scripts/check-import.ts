@@ -28,15 +28,15 @@ async function main() {
     legacyLocation,
     legacyTankId,
     displayName: pondCode,
-    site: "Penang HQ",
-    siteCode: "PEN",
+    site: "PEN",
     area: legacyLocation,
     areaCode: "X",
     zone: legacyLocation,
     unitType: "tank",
   });
+  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung" });
   await db
-    .insert(schema.assets)
+    .insert(schema.pond)
     .values([
       pond("PEN-FT1-001", "Fish Tank 1", 1),
       pond("PEN-AQU-003", "Aqua", 3),
@@ -75,7 +75,7 @@ async function main() {
     (await db.select().from(schema.wqReadings).where(eq(schema.wqReadings.pondCode, code)))[0];
   const ft1 = await byPond("PEN-FT1-001");
   assert.equal(ft1.recordedAt.toISOString(), "2025-07-02T06:00:00.000Z", "afternoon = 14:00 Penang time");
-  assert.equal(ft1.enumerator, "Mahirah Mahmuddin");
+  assert.equal(ft1.person, "Mahirah Mahmuddin");
   assert.equal(ft1.appVersion, "legacy");
   const aqua = await byPond("PEN-AQU-003");
   assert.equal(aqua.recordedAt.toISOString(), "2025-07-10T00:00:00.000Z", "morning = 08:00 Penang time");
