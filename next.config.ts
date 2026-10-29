@@ -4,6 +4,9 @@ const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    agentUpgrade: "security",
+  },
   // Next.js PWA guide: security headers on every page; sw.js always revalidated and same-origin only.
   async headers() {
     return [
