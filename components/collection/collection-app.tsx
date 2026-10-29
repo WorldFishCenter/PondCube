@@ -85,8 +85,11 @@ export function CollectionApp({
   feeds: (Feed & { sites: string[] })[];
   version: string;
 }) {
-  const [pondCode, setPondCode] = React.useState("");
-  const site = ponds.find((p) => p.pondCode === pondCode)?.site;
+  const [chosenPond, setPondCode] = React.useState("");
+  // Only a pond on this Operator's list: a remembered one may since be retired, or another Operator's.
+  const pond = ponds.find((p) => p.pondCode === chosenPond);
+  const pondCode = pond?.pondCode ?? "";
+  const site = pond?.site;
   const feedsHere = feeds.filter((f) => site && f.sites.includes(site)); // the chosen pond's site's feeds
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);

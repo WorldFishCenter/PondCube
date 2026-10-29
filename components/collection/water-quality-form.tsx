@@ -1,6 +1,6 @@
 "use client";
 
-import { Controller } from "react-hook-form";
+import * as React from "react";
 import { RANGES, waterQualityForm } from "@/lib/validation";
 import { PERIODS } from "@/lib/options";
 import { FieldGroup } from "@/components/ui/field";
@@ -16,9 +16,8 @@ const READINGS = [
   { name: "nitrate", label: "Nitrate", hint: "mg/L, optional" },
 ] as const;
 
-// Keeps the time of day between readings.
-const blank = (last?: { period: "morning" | "afternoon" }) => ({
-  period: last?.period ?? "morning",
+const blank = () => ({
+  period: "morning" as (typeof PERIODS)[number]["value"], // set from Recorded-at before any save
   dissolvedOxygen: "",
   temperature: "",
   ph: "",
@@ -38,9 +37,15 @@ export function WaterQualityForm(props: RecordFormProps) {
   });
   const {
     register,
-    control,
+    setValue,
     formState: { errors },
   } = form;
+  // The Period is Recorded-at's (before noon: morning), never picked by hand.
+  const time = props.recordedAt.value.split("T")[1];
+  const period = time ? (time < "12:00" ? "morning" : "afternoon") : undefined;
+  React.useEffect(() => {
+    if (period) setValue("period", period);
+  }, [period, setValue]);
 
   return (
     <RecordCard
@@ -50,21 +55,14 @@ export function WaterQualityForm(props: RecordFormProps) {
       saveLabel="Save reading"
       {...card}
     >
-      <Controller
-        control={control}
-        name="period"
-        render={({ field }) => (
-          <ChoiceField
-            id="wq-period"
-            label="Time of day"
-            options={PERIODS}
-            value={field.value}
-            onChange={(v) => {
-              if (v) field.onChange(v);
-            }}
-            error={errors.period}
-          />
-        )}
+      <ChoiceField
+        id="wq-period"
+        label="Time of day"
+        hint="Follows the time set at the top."
+        options={PERIODS.map((p) => ({ ...p, disabled: p.value !== period }))}
+        value={period}
+        onChange={() => {}}
+        error={errors.period}
       />
       <FieldGroup className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {READINGS.map(({ name, label, hint }) => (

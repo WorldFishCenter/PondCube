@@ -15,7 +15,9 @@ export function SamplingForm(props: RecordFormProps) {
     kind: "sampling",
     schema: samplingForm,
     blank,
-    savedMessage: (record) => `Sampling event saved (${record.fish.length} fish).`,
+    // Rows left blank aren't stored, so they aren't counted.
+    savedMessage: (record) =>
+      `Sampling event saved (${record.fish.filter((f) => f.wt !== undefined || f.lenSt !== undefined).length} fish).`,
     ...props,
   });
   const {

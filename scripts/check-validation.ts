@@ -101,6 +101,10 @@ assert.equal(
 );
 bad(mortalitySchema, { recordedAt: "2026-10-09T08:00", mortalityCount: "1" });
 bad(mortalitySchema, { recordedAt: "", mortalityCount: "1" });
+// Never in the future, beyond a few minutes' grace for a device clock ahead of the server's.
+const fromNow = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+bad(mortalitySchema, { recordedAt: fromNow(60), mortalityCount: "1" });
+ok(mortalitySchema, { recordedAt: fromNow(1), mortalityCount: "1" });
 
 // The device-made id is required on save: without it a resend would be stored twice.
 bad(mortalitySchema, { id: undefined, mortalityCount: "1" });

@@ -44,6 +44,10 @@ async function main() {
   assert.equal(await pondA.submit({ temperature: "28" }, ""), "noRecordedAt");
   assert.equal(outbox.kept.length, 0, "nothing is kept without a Recorded-at");
   assert.deepEqual(pondA.restore(), { temperature: "28" });
+  // Recorded-at later than now: not saved either.
+  assert.equal(await pondA.submit({ temperature: "28" }, "2999-01-01T08:00"), "futureRecordedAt");
+  assert.equal(outbox.kept.length, 0, "nothing is kept with a future Recorded-at");
+  assert.deepEqual(pondA.restore(), { temperature: "28" });
 
   // Neither in the Outbox nor on the server (no room on the device, no signal): the Draft stays.
   const nowhere = createDraft<Values>("wq", "A", fakeKeep(false).keep, store);

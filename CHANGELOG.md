@@ -4,6 +4,18 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.9.0] - 2026-10-29
+
+### Changed
+
+- Water quality: the time of day is now set by the date & time at the top, so it can't disagree with it: before noon is morning, from noon on is afternoon.
+- The date & time at the top can no longer be later than now. Future days can't be picked, and a record set later than now isn't saved until you correct it.
+
+### Fixed
+
+- If the pond remembered on your device is no longer on your list (retired, or at another site), the app now asks you to pick a pond instead of recording to one it doesn't show.
+- After saving a sampling, the message counts only the fish you measured, not rows left blank.
+
 ## [0.8.0] - 2026-10-29
 
 ### Changed

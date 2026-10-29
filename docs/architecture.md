@@ -2,7 +2,7 @@
 
 How PondCube Collect is built and where its data lives. This is the reference for
 infrastructure and roadmap decisions; day-to-day coding rules are in
-`.claude/CLAUDE.md`, and domain terms are in `docs/glossary.md`.
+`CLAUDE.md`, and domain terms are in `docs/glossary.md`.
 
 ## The shape of the system
 

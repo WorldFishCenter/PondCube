@@ -1,5 +1,5 @@
 import { attempt, browserStorage, removeLocal, writeLocal, type KeyValueStorage } from "./storage";
-import { recordedAtLocal, withNewNames } from "./validation";
+import { isFuture, recordedAtLocal, withNewNames } from "./validation";
 
 // Drafts: a Record being filled in, kept per Record kind and Pond until Save puts it somewhere safe.
 
@@ -7,7 +7,7 @@ import { recordedAtLocal, withNewNames } from "./validation";
 export const draftKey = (kind: string, pondCode: string) => `pondcube:draft:${kind}:${pondCode}`;
 
 /** What a submit led to. Only "kept" (the Record is in the Outbox or on the server) clears the Draft. */
-export type Submitted = "kept" | "notKept" | "noRecordedAt";
+export type Submitted = "kept" | "notKept" | "noRecordedAt" | "futureRecordedAt";
 
 /** A Draft from restore to Save. Edits inside muted() (the form's own resets) are never kept. */
 export function createDraft<T, R extends object = object>(
@@ -32,6 +32,7 @@ export function createDraft<T, R extends object = object>(
     submit: async (record: R, recordedAt: string): Promise<Submitted> => {
       const at = recordedAtLocal.safeParse(recordedAt);
       if (!at.success) return "noRecordedAt";
+      if (isFuture(at.data)) return "futureRecordedAt";
       if (!(await keep({ ...record, recordedAt: at.data }))) return "notKept";
       removeLocal(key, storage);
       return "kept";

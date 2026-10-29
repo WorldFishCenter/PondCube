@@ -63,7 +63,8 @@ nitrate, taken in a Period.
 _Avoid_: WQ entry, measurement
 
 **Period**
-The time of day a Water-quality reading belongs to: morning or afternoon.
+The time of day a Water-quality reading belongs to: morning or afternoon. Set from the
+Recorded-at hour (before noon: morning), never picked by hand.
 _Avoid_: shift, session
 
 **Feed**
@@ -91,7 +92,7 @@ _Avoid_: fish row, specimen
 **Recorded-at**
 The instant the observation was made (not when it was saved), entered in the
 Operator's local time. Set in the top panel for each Record: it starts empty and
-clears after every save, so no Record inherits an earlier one's time.
+clears after every save, so no Record inherits an earlier one's time. Never later than now.
 _Avoid_: timestamp, created at, date
 
 **Range**

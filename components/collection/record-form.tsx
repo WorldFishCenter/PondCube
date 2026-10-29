@@ -41,6 +41,7 @@ export type RecordFormProps = { pondCode: string; recordedAt: RecordedAt; outbox
 type Submission = { id: string; msg: string } | Exclude<Submitted, "kept"> | null;
 const NOT_SAVED: Record<Exclude<Submitted, "kept">, string> = {
   noRecordedAt: "Set the date & time at the top before saving.",
+  futureRecordedAt: "The date & time at the top is later than now: correct it before saving.",
   notKept:
     "This device has no room to keep it and it couldn't be sent. Your entry is still here: try again with signal.",
 };
@@ -198,6 +199,7 @@ export function RecordedAtField({
               className="[--cell-size:--spacing(11)]" // 44px days: the app's touch-target size
               selected={date}
               defaultMonth={date}
+              disabled={{ after: new Date() }}
               onSelect={(d) => {
                 onChange(`${format(d, "yyyy-MM-dd")}T${time || format(new Date(), "HH:mm")}`);
                 setOpen(false);
@@ -305,6 +307,7 @@ const SELECTED_CHOICE =
 export function ChoiceField({
   id,
   label,
+  hint,
   options,
   value,
   onChange,
@@ -312,7 +315,8 @@ export function ChoiceField({
 }: {
   id: string;
   label: string;
-  options: readonly { value: string; label: string }[];
+  hint?: string;
+  options: readonly { value: string; label: string; disabled?: boolean }[];
   value: string | undefined;
   onChange: (value: string | undefined) => void;
   error?: Message;
@@ -329,12 +333,17 @@ export function ChoiceField({
         onValueChange={(v) => onChange(v[0])}
       >
         {options.map((o) => (
-          <ToggleGroupItem key={o.value} value={o.value} className={cn("flex-1", SELECTED_CHOICE)}>
+          <ToggleGroupItem
+            key={o.value}
+            value={o.value}
+            disabled={o.disabled}
+            className={cn("flex-1", SELECTED_CHOICE)}
+          >
             {o.label}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      {error && <FieldError errors={[error]} />}
+      {error ? <FieldError errors={[error]} /> : hint ? <FieldDescription>{hint}</FieldDescription> : null}
     </Field>
   );
 }

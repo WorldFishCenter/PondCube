@@ -45,12 +45,16 @@ const reqNum = (min: number, max: number, label: string, int = false) => {
 //   no offset, so it's read in the operator's timezone, on their device, before each save.
 // - Save: the server (UTC on Vercel) accepts only an instant, a Date or an ISO string with an offset
 //   or Z. An offset-less string would silently shift by the server's timezone, so it's rejected.
+// - Both: never in the future (isFuture).
 export const recordedAtLocal = z.coerce.date({ error: "Enter a valid date & time" });
+/** Later than now, with a few minutes' grace for a device clock ahead of the server's. */
+export const isFuture = (at: Date) => at.getTime() > Date.now() + 5 * 60_000;
 const recordedAtInstant = z
   .union([z.date(), z.iso.datetime({ offset: true })], {
     error: "Recorded-at must be an instant (Date, or ISO with offset)",
   })
-  .pipe(z.coerce.date());
+  .pipe(z.coerce.date())
+  .refine((at) => !isFuture(at), "Recorded-at can't be in the future");
 
 // Each record type has a form schema (what the operator fills in, checked on the device) and a
 // save schema (form + who/where + recorded-at instant, re-checked by record intake before insert).
