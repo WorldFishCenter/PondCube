@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { SignIn } from "@clerk/nextjs";
 import { signedInAccess } from "@/lib/access";
-import { getPonds } from "@/lib/data";
+import { getFeeds, getPonds } from "@/lib/data";
 import { CollectionApp, CollectionSkeleton, Shell } from "@/components/collection/collection-app";
 import { NotOnListCard } from "@/components/collection/not-on-list-card";
 import { InstallPrompt } from "@/components/install-prompt";
@@ -28,11 +28,13 @@ async function App() {
         <NotOnListCard />
       </Shell>
     );
+  const [ponds, feeds] = await Promise.all([getPonds(access.sites), getFeeds(access.sites)]);
   return (
     <CollectionApp
-      enumerator={access.operator}
+      person={access.operator}
       account={access.account}
-      ponds={await getPonds()}
+      ponds={ponds}
+      feeds={feeds}
       version={APP_VERSION}
     />
   );

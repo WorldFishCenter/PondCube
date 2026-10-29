@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CAUSES, FEED_TYPES, PERIODS } from "./options";
+import { CAUSES, PERIODS } from "./options";
 
 // Inputs give "" for empty; anything else becomes a Number (NaN then fails z.number).
 const toNumber = (v: unknown) => (v === "" || v === null || v === undefined ? undefined : Number(v));
@@ -8,7 +8,7 @@ const toNumber = (v: unknown) => (v === "" || v === null || v === undefined ? un
 const enumOf = <T extends readonly { value: string }[]>(options: T, error?: string) =>
   z.enum(options.map((o) => o.value) as [T[number]["value"], ...T[number]["value"][]], error ? { error } : undefined);
 
-// One source for water-quality ranges: the schema enforces them, the form shows them as hints.
+// One source for ranges: the schema enforces them, the form shows them as hints.
 export const RANGES = {
   dissolvedOxygen: [0, 20],
   temperature: [0, 45],
@@ -16,6 +16,8 @@ export const RANGES = {
   ammonia: [0, 100],
   nitrite: [0, 100],
   nitrate: [0, 500],
+  wt: [0, 20000], // DMS v3 trait WT, g
+  lenSt: [0, 100], // DMS v3 trait LEN_ST, cm
 } as const;
 
 // Optional decimal. int: counts map to integer DB columns, so reject decimals here rather than at insert.
@@ -52,13 +54,13 @@ const recordedAtInstant = z
 
 // Each record type has a form schema (what the operator fills in, checked on the device) and a
 // save schema (form + who/where + recorded-at instant, re-checked by record intake before insert).
-// Where is the Pond picked in the app shell; who is the Enumerator, added on the server.
+// Where is the Pond picked in the app shell; who is the Person, added on the server.
 // Ids are made on the device when Save checks the form, and required on save: intake skips a resend.
 const madeAtSave = () => z.uuid().default(() => crypto.randomUUID());
 const forSave = {
   id: z.uuid(),
   pondCode: z.string().min(1, "Select a pond"),
-  enumerator: z.string().min(1),
+  person: z.string().min(1),
   recordedAt: recordedAtInstant,
 };
 
@@ -77,8 +79,7 @@ export const waterQualitySchema = waterQualityForm.extend(forSave);
 
 export const feedingForm = z.object({
   id: madeAtSave(),
-  feedType: enumOf(FEED_TYPES).optional(),
-  feedTypeOther: z.string().optional(),
+  feed: z.string().optional(), // a feed of the pond's site: refusal() in lib/operators.ts checks that
   feedAmountKg: reqNum(0, 100000, "Amount fed (kg)"),
   feedingsCount: optNum(0, 100, true),
   remarks: z.string().optional(),
@@ -88,16 +89,18 @@ export const feedingSchema = feedingForm.extend(forSave);
 export const mortalityForm = z.object({
   id: madeAtSave(),
   mortalityCount: reqNum(0, 1000000, "Number of dead fish", true),
-  suspectedCause: enumOf(CAUSES).optional(),
-  remarks: z.string().optional(),
+  causeDeath: enumOf(CAUSES).optional(),
+  noteDeath: z.string().optional(),
 });
 export const mortalitySchema = mortalityForm.extend(forSave);
 
+// A fish never weighs or measures 0, though the DMS Range starts there.
+const trait = (range: readonly [number, number]) => optNum(...range).refine((v) => v !== 0, "Must be more than 0");
 const fishMeasurements = <Id extends z.ZodType<string>>(id: Id) =>
   z
-    .array(z.object({ id, weightG: optNum(0.0001, 1000000), lengthCm: optNum(0.0001, 1000) }))
+    .array(z.object({ id, wt: trait(RANGES.wt), lenSt: trait(RANGES.lenSt) }))
     .refine(
-      (fish) => fish.some((f) => f.weightG !== undefined || f.lengthCm !== undefined),
+      (fish) => fish.some((f) => f.wt !== undefined || f.lenSt !== undefined),
       "Add at least one fish measurement",
     );
 
@@ -116,3 +119,31 @@ export const RECORD_KINDS = {
   sampling: { form: samplingForm, save: samplingSchema },
 } as const;
 export type RecordKind = keyof typeof RECORD_KINDS;
+
+// Drafts and Outbox Records saved before 0.8.0 carry the fields' earlier names: read them under the DMS v3 ones.
+// A value with no new field (an old feed type, an old cause the DMS lacks) goes in the note, as in the database.
+const OLD_CAUSES: Record<string, string> = {
+  disease: "Disease_parasites",
+  water_quality: "Water_quality",
+  unknown: "Unknown",
+};
+const joinNotes = (...notes: unknown[]) => notes.filter(Boolean).join("; ");
+export function withNewNames(kind: string, fields: Record<string, unknown>): Record<string, unknown> {
+  if (kind === "mortality" && ("suspectedCause" in fields || "remarks" in fields)) {
+    const { suspectedCause: cause, remarks, ...rest } = fields;
+    const causeDeath = OLD_CAUSES[String(cause)];
+    return { ...rest, causeDeath, noteDeath: joinNotes(remarks, cause && !causeDeath && `Cause: ${cause}`) };
+  }
+  if (kind === "feeding" && ("feedType" in fields || "feedTypeOther" in fields)) {
+    const { feedType: type, feedTypeOther: other, ...rest } = fields;
+    return { ...rest, remarks: joinNotes(rest.remarks, type && `Feed type: ${(type === "other" && other) || type}`) };
+  }
+  if (kind === "sampling" && Array.isArray(fields.fish))
+    return {
+      ...fields,
+      fish: fields.fish.map(({ weightG, lengthCm, ...fish }) =>
+        weightG === undefined && lengthCm === undefined ? fish : { ...fish, wt: weightG, lenSt: lengthCm },
+      ),
+    };
+  return fields;
+}

@@ -39,7 +39,7 @@ const deviceOutbox = createOutbox(send);
 export type Outbox = ReturnType<typeof useOutbox>;
 
 /** Sends on open, on coming back to the app, when signal returns, after each Save and on Send now. */
-export function useOutbox(account: string, enumerator: string) {
+export function useOutbox(account: string, person: string) {
   const [waiting, setWaiting] = React.useState<WaitingRecord[]>([]);
   const [sending, setSending] = React.useState(false);
   const [stopped, setStopped] = React.useState<Stopped>();
@@ -68,12 +68,12 @@ export function useOutbox(account: string, enumerator: string) {
 
   const add = React.useCallback(
     async (kind: RecordKind, record: WaitingRecord["record"]) => {
-      const safe = await deviceOutbox.add({ kind, account, enumerator, record });
+      const safe = await deviceOutbox.add({ kind, account, person, record });
       setWaiting(deviceOutbox.all());
       flush();
       return safe;
     },
-    [account, enumerator, flush],
+    [account, person, flush],
   );
 
   return {
@@ -115,8 +115,8 @@ export function OutboxAlert({ outbox, className }: { outbox: Outbox; className?:
         )}
         {others.length > 0 && (
           <p>
-            {records(others.length)} by {[...new Set(others.map((w) => w.enumerator))].join(", ")}: sent when they sign
-            in on this device.
+            {records(others.length)} by {[...new Set(others.map((w) => w.person))].join(", ")}: sent when they sign in
+            on this device.
           </p>
         )}
       </AlertDescription>

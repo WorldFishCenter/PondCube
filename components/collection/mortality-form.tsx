@@ -3,14 +3,9 @@
 import { Controller } from "react-hook-form";
 import { mortalityForm } from "@/lib/validation";
 import { CAUSES } from "@/lib/options";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { NotesField, NumberField, RecordCard, type RecordFormProps, useRecordForm } from "./record-form";
+import { NotesField, NumberField, RecordCard, SelectField, type RecordFormProps, useRecordForm } from "./record-form";
 
-// Base UI Select: the null item is the placeholder (and lets the operator clear the choice).
-const CAUSE_ITEMS = [{ value: null, label: "Select a cause" }, ...CAUSES];
-
-const blank = () => ({ mortalityCount: "", suspectedCause: undefined, remarks: "" });
+const blank = () => ({ mortalityCount: "", causeDeath: undefined, noteDeath: "" });
 
 export function MortalityForm(props: RecordFormProps) {
   const { form, card } = useRecordForm({
@@ -41,35 +36,21 @@ export function MortalityForm(props: RecordFormProps) {
         error={errors.mortalityCount}
         {...register("mortalityCount")}
       />
-      <Field>
-        <FieldLabel htmlFor="mo-cause">Suspected cause</FieldLabel>
-        <Controller
-          control={control}
-          name="suspectedCause"
-          render={({ field }) => (
-            <Select
-              items={CAUSE_ITEMS}
-              value={field.value ?? null}
-              onValueChange={(v) => field.onChange(v ?? undefined)}
-            >
-              <SelectTrigger id="mo-cause">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {CAUSE_ITEMS.map((c) => (
-                    <SelectItem key={c.value ?? "none"} value={c.value}>
-                      {c.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          )}
-        />
-        <FieldDescription>Optional.</FieldDescription>
-      </Field>
-      <NotesField id="mo-r" {...register("remarks")} />
+      <Controller
+        control={control}
+        name="causeDeath"
+        render={({ field }) => (
+          <SelectField
+            id="mo-cause"
+            label="Cause of death"
+            placeholder="Select a cause"
+            options={CAUSES}
+            value={field.value}
+            onChange={field.onChange}
+          />
+        )}
+      />
+      <NotesField id="mo-r" label="Note" {...register("noteDeath")} />
     </RecordCard>
   );
 }

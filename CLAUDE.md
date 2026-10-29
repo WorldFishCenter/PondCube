@@ -27,8 +27,8 @@ Hosted on Vercel (functions pinned to Singapore). Node 20+.
 | `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                                                 |
 | `npm run check`                               | Self-checks: validation ranges, draft lifecycle, outbox, record intake, Airtable sync, operator access, legacy import — against in-memory Postgres (PGLite, no network) |
 | `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                                                |
-| `npm run db:sync`                             | Check, then copy ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                                                |
-| `npm run db:sync-ponds` / `db:sync-operators` | Same, one table only                                                                                                                                                    |
+| `npm run db:sync`                             | Check, then copy sites + species + feeds + ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                      |
+| `npm run db:sync-ponds` / `db:sync-operators` | Same, sites + ponds (with species) or sites + operators only                                                                                                            |
 | `npm run db:import-legacy -- <csv>`           | One-off: legacy water-quality log (converted CSV) → `wq_readings`, checked, all-or-nothing; `-- --prod` as above                                                        |
 
 Run `npm run check`, `npm run typecheck` and `npm run format:check` before committing.
@@ -39,7 +39,7 @@ Run `npm run check`, `npm run typecheck` and `npm run format:check` before commi
 app/page.tsx              Signed-in operator check per request (Suspense), then cached ponds
 app/layout.tsx            Inter font (shadcn preset), viewport, ClerkProvider (shadcn theme), ThemeProvider
 app/sign-in               Clerk's sign-in page (sign-in-or-up, no sign-up page); proxy.ts = clerkMiddleware (routes stay public)
-app/api/records/route.ts  Where the Outbox sends each Record (POST); Enumerator = signed-in operator
+app/api/records/route.ts  Where the Outbox sends each Record (POST); Person = signed-in operator
 app/globals.css           shadcn theme tokens (incl. --logo-outline) + 44px touch-target rule
 app/icon.svg              Favicon (outline follows OS theme); apple-icon.png = iOS home screen
 app/manifest.ts           Web app manifest (installable); icons in public/icon-*.png
@@ -54,19 +54,22 @@ components/collection/*    App UI: shell (who/where/when panel, record kinds →
                           the 4 forms, feedback sheet (Airtable form); record-form.tsx = shared form hook (draft, save) + fields;
                           outbox.tsx = sending to app/api/records + the "waiting to send" notice
 lib/schema.ts             Drizzle tables — the single source of truth for the data model
-lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules; RECORD_KINDS
-lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing; the caller names the Enumerator
-lib/data.ts               Server-only cached reads (ponds, operator by email)
+lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules; RECORD_KINDS; withNewNames() reads
+                          Drafts and Outbox Records saved before 0.8.0
+lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing; the caller names the Person
+lib/data.ts               Server-only cached reads (operator by email, a site's ponds and feeds)
 lib/access.ts             Signed-in access: wires Clerk into lib/operators.ts (server-only)
-lib/operators.ts          Operator access: account → signed out / not on the list / Operator; email normaliser (shared with sync)
+lib/operators.ts          Operator access: account → signed out / not on the list / Operator (with sites); refusal() = pond not at
+                          their sites or feed not used there; email normaliser (shared with sync)
 lib/storage.ts            Device storage seam (localStorage, guarded): Drafts, Outbox, remembered pond and Recorded-at
 lib/draft.ts              Draft per record kind + pond: restore, change, submit to the Outbox (only that clears it; storage + keep injected)
 lib/outbox.ts             Outbox: saved Records waiting on the device, sent one at a time, removed only once stored (storage + send injected)
 lib/db.ts                 Neon HTTP + Drizzle client (server-only)
-lib/options.ts            Choice lists (periods, feed types, causes)
+lib/options.ts            Choice lists (periods, causes); feeds come from each site's list in the database
 lib/version.ts            App version from package.json (server-only: footer, feedback form)
-scripts/sync-airtable.ts  Airtable (PondCube base: ponds, operators) → Neon assets/operators
+scripts/sync-airtable.ts  Airtable (PondCube base: sites, species, feeds, ponds, operators) → Neon, same tables
 scripts/import-legacy.ts  One-off: legacy Excel log (converted CSV) → wq_readings; its decisions are in the file header
+scripts/migrate-0.8.0.sql One-off: production from 0.7.0 to 0.8.0 (DMS v3 renames, values kept); see docs/architecture.md
 scripts/check-*.ts        The self-checks run by `npm run check` (fake-storage.ts: their storage adapters)
 ```
 
@@ -133,13 +136,13 @@ These favour care over speed; on trivial tasks, use judgment.
 - **Server-only boundaries.** `lib/db.ts`, `lib/data.ts`, `lib/access.ts` and
   `app/api/*` are server-only. Never import them into client components or leak
   `DATABASE_URL`/`CLERK_SECRET_KEY` to the client.
-- **Everything keys on `pond_code`.** It's the join across assets, every event
+- **Everything keys on `pond_code`.** It's the join across the pond table, every event
   table, legacy history, and (later) sensor data.
 
 ## Data & infrastructure (summary)
 
 One Neon Postgres database in Singapore holds all records. Two branches:
-`main` = production, `dev` = development (same schema, isolated data); the app just
+`production` and `dev` (same schema, isolated data); the app just
 reads `DATABASE_URL`. Airtable is the human editing surface for the pond list and is
 synced one-way into Neon (`npm run db:sync`) — don't treat Neon as the pond editor.
 Operators are edited there too, with the `email` they sign in with (`active` unticked

@@ -1,5 +1,5 @@
 import { attempt, browserStorage, removeLocal, writeLocal, type KeyValueStorage } from "./storage";
-import { recordedAtLocal } from "./validation";
+import { recordedAtLocal, withNewNames } from "./validation";
 
 // Drafts: a Record being filled in, kept per Record kind and Pond until Save puts it somewhere safe.
 
@@ -11,16 +11,19 @@ export type Submitted = "kept" | "notKept" | "noRecordedAt";
 
 /** A Draft from restore to Save. Edits inside muted() (the form's own resets) are never kept. */
 export function createDraft<T, R extends object = object>(
-  key: string,
+  kind: string,
+  pondCode: string,
   keep: (record: R & { recordedAt: Date }) => Promise<boolean>,
   storage: KeyValueStorage = browserStorage,
 ) {
+  const key = draftKey(kind, pondCode);
   let muted = false;
   return {
+    /** Saved before 0.8.0, it comes back under the new field names. */
     restore: (): Partial<T> | null =>
       attempt(() => {
         const raw = storage.getItem(key);
-        return raw ? (JSON.parse(raw) as Partial<T>) : null;
+        return raw ? (withNewNames(kind, JSON.parse(raw)) as Partial<T>) : null;
       }, null),
     change: (values: unknown) => {
       if (!muted) writeLocal(key, JSON.stringify(values), storage);

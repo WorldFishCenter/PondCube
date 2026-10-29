@@ -31,11 +31,11 @@ async function main() {
     return intake.save(kind, sent, "Operator 1");
   };
 
-  await db.insert(schema.assets).values({
+  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung" });
+  await db.insert(schema.pond).values({
     pondCode: "PEN-FT1-001",
     displayName: "Fish Tank 1 - #1",
-    site: "Penang HQ",
-    siteCode: "PEN",
+    site: "PEN",
     area: "Fish Tank 1",
     areaCode: "FT1",
     zone: "Fish Tank 1",
@@ -60,17 +60,17 @@ async function main() {
   assert.equal(wq.ph, null);
   assert.equal(wq.recordedAt.toISOString(), recordedAt.toISOString(), "recorded-at keeps its instant");
   assert.equal(wq.appVersion, "9.9.9", "stamped with the server's app version");
-  await save("feeding", { ...who, recordedAt, feedType: "pellet", feedAmountKg: "3.5", feedingsCount: "2" });
-  await save("mortality", { ...who, recordedAt, mortalityCount: "3", suspectedCause: "water_quality" });
+  await save("feeding", { ...who, recordedAt, feedAmountKg: "3.5", feedingsCount: "2" });
+  await save("mortality", { ...who, recordedAt, mortalityCount: "3", causeDeath: "Water_quality" });
   assert.equal(await rows(schema.feedingEvents), 1);
-  assert.equal((await db.select().from(schema.mortalityEvents))[0].suspectedCause, "water_quality");
+  assert.equal((await db.select().from(schema.mortalityEvents))[0].causeDeath, "Water_quality");
 
   // Sampling: event + measured fish in one write; blank rows are skipped.
   await save("sampling", {
     ...who,
     recordedAt,
     notes: "batch 7",
-    fish: [{ weightG: "120", lengthCm: "18" }, { weightG: "", lengthCm: "" }, { weightG: "95" }],
+    fish: [{ wt: "120", lenSt: "18" }, { wt: "", lenSt: "" }, { wt: "95" }],
   });
   const [event] = await db.select().from(schema.samplingEvents);
   const fish = await db
@@ -84,7 +84,7 @@ async function main() {
   await assert.rejects(save("wq", { ...who, recordedAt, period: "morning", dissolvedOxygen: "25", temperature: "28" }));
   await assert.rejects(save("mortality", { ...who, recordedAt, mortalityCount: "2.5" }));
   await assert.rejects(save("mortality", { ...who, recordedAt: "2026-10-09T08:00", mortalityCount: "1" }));
-  await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ weightG: "", lengthCm: "" }] }));
+  await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ wt: "", lenSt: "" }] }));
   await assert.rejects(save("bogus" as RecordKind, { ...who, recordedAt })); // deliberately ill-typed
   assert.equal(await rows(schema.wqReadings), 1);
   assert.equal(await rows(schema.mortalityEvents), 1);
@@ -94,7 +94,7 @@ async function main() {
 
   // Atomic: if the fish insert fails, the sampling event is not kept either.
   await client.exec("ALTER TABLE fish_measurements RENAME TO fish_measurements_off");
-  await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ weightG: "50" }] }));
+  await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ wt: "50" }] }));
   await client.exec("ALTER TABLE fish_measurements_off RENAME TO fish_measurements");
   assert.equal(await rows(schema.samplingEvents), 1, "no orphan sampling event");
 
@@ -107,8 +107,8 @@ async function main() {
     ...again,
     id: id(),
     fish: [
-      { id: id(), weightG: "10" },
-      { id: id(), weightG: "11" },
+      { id: id(), wt: "10" },
+      { id: id(), wt: "11" },
     ],
   };
   await save("sampling", sample);
@@ -121,9 +121,9 @@ async function main() {
     "no id, not stored",
   );
 
-  // The Enumerator is the caller's (the signed-in Operator), whatever the device sends.
-  await save("feeding", { ...who, recordedAt, feedAmountKg: "1", enumerator: "Someone else" });
-  assert.ok((await db.select().from(schema.feedingEvents)).every((f) => f.enumerator === "Operator 1"));
+  // The Person is the caller's (the signed-in Operator), whatever the device sends.
+  await save("feeding", { ...who, recordedAt, feedAmountKg: "1", person: "Someone else" });
+  assert.ok((await db.select().from(schema.feedingEvents)).every((f) => f.person === "Operator 1"));
 
   // (Field names vs columns are checked when lib/intake.ts loads: reaching this line means they match.)
   await client.close();

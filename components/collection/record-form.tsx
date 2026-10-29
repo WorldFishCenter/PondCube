@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { format, parse } from "date-fns";
 import { AlertCircle, CheckCircle2, ChevronDownIcon } from "lucide-react";
-import { createDraft, draftKey, type Submitted } from "@/lib/draft";
+import { createDraft, type Submitted } from "@/lib/draft";
 import type { RECORD_KINDS, RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -67,7 +68,7 @@ export function useRecordForm<K extends RecordKind, TValues extends FieldValues,
   const { reset, watch, handleSubmit, formState } = form;
   const { add } = outbox; // stable across renders, unlike the outbox object
   const draft = React.useMemo(
-    () => createDraft<TValues, TRecord>(draftKey(kind, pondCode), (record) => add(kind, { ...record, pondCode })),
+    () => createDraft<TValues, TRecord>(kind, pondCode, (record) => add(kind, { ...record, pondCode })),
     [kind, pondCode, add],
   );
 
@@ -256,6 +257,45 @@ export function NotesField({
   );
 }
 
+// An optional pick from a list, per Base UI Select: the null item is the placeholder and clears the choice.
+export function SelectField({
+  id,
+  label,
+  placeholder,
+  options,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  options: readonly { value: string; label: string }[];
+  value: string | undefined;
+  onChange: (value: string | undefined) => void;
+}) {
+  const items = [{ value: null, label: placeholder }, ...options];
+  return (
+    <Field>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <Select items={items} value={value ?? null} onValueChange={(v) => onChange(v ?? undefined)}>
+        <SelectTrigger id={id}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {items.map((item) => (
+              <SelectItem key={item.value ?? "none"} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <FieldDescription>Optional.</FieldDescription>
+    </Field>
+  );
+}
+
 // The chosen option gets a primary border and a light primary tint (lighter than the filled
 // record-kind tab); the stock pressed state (bg-muted) is the same grey as hover and hard to see.
 const SELECTED_CHOICE =
@@ -269,7 +309,6 @@ export function ChoiceField({
   value,
   onChange,
   error,
-  hint,
 }: {
   id: string;
   label: string;
@@ -277,7 +316,6 @@ export function ChoiceField({
   value: string | undefined;
   onChange: (value: string | undefined) => void;
   error?: Message;
-  hint?: string;
 }) {
   return (
     <Field data-invalid={!!error}>
@@ -296,7 +334,7 @@ export function ChoiceField({
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      {error ? <FieldError errors={[error]} /> : hint ? <FieldDescription>{hint}</FieldDescription> : null}
+      {error && <FieldError errors={[error]} />}
     </Field>
   );
 }

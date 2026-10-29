@@ -9,10 +9,10 @@ const fakeSend = (answer: (w: WaitingRecord) => Sent) => {
   return { sent, send: async (w: WaitingRecord) => (sent.push(w.record.id), answer(w)) };
 };
 let n = 0;
-const saved = (account = "user_ana", enumerator = "Ana"): WaitingRecord => ({
+const saved = (account = "user_ana", person = "Ana"): WaitingRecord => ({
   kind: "mortality",
   account,
-  enumerator,
+  person,
   record: { id: `id-${++n}`, pondCode: "PEN-FT1-001" },
 });
 const ids = (ws: WaitingRecord[]) => ws.map((w) => w.record.id).sort();
@@ -89,6 +89,14 @@ async function main() {
   assert.deepEqual(createOutbox(direct.send, broken).all(), []);
   store.map.set("pondcube:outbox:x", "{not json");
   assert.equal(createOutbox(net.send, store).all().length, 1, "only the corrupt entry is skipped");
+
+  // Saved before 0.8.0: read under the new names, so it still sends and shows who made it.
+  const old = memory();
+  const record = { id: "id-old", pondCode: "PEN-FT1-001", suspectedCause: "unknown" };
+  old.map.set("pondcube:outbox:id-old", JSON.stringify({ kind: "mortality", account: "a", enumerator: "Ana", record }));
+  const [read] = createOutbox(net.send, old).all();
+  assert.equal(read.person, "Ana");
+  assert.equal(read.record.causeDeath, "Unknown");
 
   console.log("outbox OK");
 }

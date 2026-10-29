@@ -1,27 +1,56 @@
 import { pgTable, text, integer, doublePrecision, timestamp, date, boolean, uuid } from "drizzle-orm/pg-core";
 
-// ---- Static asset dimension (mirrors the Airtable asset table) ----
-export const assets = pgTable("assets", {
+// ---- Sites (mirrors the Airtable sites table; WorldFish DMS v3 SITE) ----
+// The DMS requires owner, contact and position too; empty here until they're known.
+export const site = pgTable("site", {
+  site: text("site").primaryKey(), // three uppercase letters, e.g. PEN
+  nameSite: text("name_site").notNull(),
+  ownerSite: text("owner_site"),
+  phoneSite: text("phone_site"),
+  emailSite: text("email_site"),
+  latSite: doublePrecision("lat_site"),
+  longSite: doublePrecision("long_site"),
+  noteSite: text("note_site"),
+});
+
+// ---- Species (mirrors the Airtable species table; WorldFish DMS v3 SPECIES) ----
+export const species = pgTable("species", {
+  species: text("species").primaryKey(), // two uppercase letters, e.g. ON
+  speciesLatin: text("species_latin").notNull().unique(),
+  speciesCommon: text("species_common"),
+});
+
+// ---- Feeds (mirrors the Airtable feeds table; WorldFish DMS v3 FEED) ----
+export const feed = pgTable("feed", {
+  feed: text("feed").primaryKey(), // three characters, e.g. SUP
+  noteFeed: text("note_feed"),
+  // ponytail: no FK on array items, as for operators.sites. Empty once removed from Airtable: offered nowhere.
+  sites: text("sites").array().notNull(), // the sites that use it
+});
+
+// ---- Ponds (mirrors the Airtable ponds table; WorldFish DMS v3 names where it has one) ----
+export const pond = pgTable("pond", {
   pondCode: text("pond_code").primaryKey(), // e.g. PEN-FT3-091
   displayName: text("display_name").notNull(),
-  site: text("site").notNull(),
-  siteCode: text("site_code").notNull(),
+  site: text("site")
+    .notNull()
+    .references(() => site.site),
   area: text("area").notNull(),
   areaCode: text("area_code").notNull(),
   zone: text("zone").notNull(),
   unitType: text("unit_type").notNull(),
   legacyLocation: text("legacy_location"),
   legacyTankId: integer("legacy_tank_id"),
-  latitude: doublePrecision("latitude"),
-  longitude: doublePrecision("longitude"),
+  latPond: doublePrecision("lat_pond"),
+  longPond: doublePrecision("long_pond"),
   volumeM3: doublePrecision("volume_m3"),
-  surfaceAreaM2: doublePrecision("surface_area_m2"),
+  areaPond: doublePrecision("area_pond"), // hectares
   depthM: doublePrecision("depth_m"),
   waterSource: text("water_source"),
-  speciesStrain: text("species_strain"),
+  species: text("species").references(() => species.species),
   status: text("status").notNull().default("active"),
   commissionedDate: date("commissioned_date"),
-  notes: text("notes"),
+  notePond: text("note_pond"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -31,6 +60,8 @@ export const operators = pgTable("operators", {
   name: text("name").notNull().unique(),
   email: text("email").unique(), // lowercase; no email = can't sign in
   active: boolean("active").notNull().default(true),
+  // ponytail: no FK on array items; the sync only writes codes of existing sites. Join table if other writers appear.
+  sites: text("sites").array().notNull(), // site codes: sees and records only these sites' ponds
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -39,7 +70,7 @@ export const wqReadings = pgTable("wq_readings", {
   id: uuid("id").primaryKey().defaultRandom(),
   pondCode: text("pond_code")
     .notNull()
-    .references(() => assets.pondCode),
+    .references(() => pond.pondCode),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
   period: text("period").notNull(), // morning | afternoon
   dissolvedOxygen: doublePrecision("dissolved_oxygen"),
@@ -49,7 +80,7 @@ export const wqReadings = pgTable("wq_readings", {
   nitrite: doublePrecision("nitrite"),
   nitrate: doublePrecision("nitrate"),
   remarks: text("remarks"),
-  enumerator: text("enumerator").notNull(),
+  person: text("person").notNull(),
   appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -59,14 +90,13 @@ export const feedingEvents = pgTable("feeding_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   pondCode: text("pond_code")
     .notNull()
-    .references(() => assets.pondCode),
+    .references(() => pond.pondCode),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
-  feedType: text("feed_type"),
-  feedTypeOther: text("feed_type_other"),
+  feed: text("feed").references(() => feed.feed),
   feedAmountKg: doublePrecision("feed_amount_kg"),
   feedingsCount: integer("feedings_count"),
   remarks: text("remarks"),
-  enumerator: text("enumerator").notNull(),
+  person: text("person").notNull(),
   appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -76,12 +106,12 @@ export const mortalityEvents = pgTable("mortality_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   pondCode: text("pond_code")
     .notNull()
-    .references(() => assets.pondCode),
+    .references(() => pond.pondCode),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
   mortalityCount: integer("mortality_count").notNull(),
-  suspectedCause: text("suspected_cause"),
-  remarks: text("remarks"),
-  enumerator: text("enumerator").notNull(),
+  causeDeath: text("cause_death"),
+  noteDeath: text("note_death"),
+  person: text("person").notNull(),
   appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -91,10 +121,10 @@ export const samplingEvents = pgTable("sampling_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   pondCode: text("pond_code")
     .notNull()
-    .references(() => assets.pondCode),
+    .references(() => pond.pondCode),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
   notes: text("notes"),
-  enumerator: text("enumerator").notNull(),
+  person: text("person").notNull(),
   appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -104,6 +134,6 @@ export const fishMeasurements = pgTable("fish_measurements", {
   samplingEventId: uuid("sampling_event_id")
     .notNull()
     .references(() => samplingEvents.id, { onDelete: "cascade" }),
-  weightG: doublePrecision("weight_g"),
-  lengthCm: doublePrecision("length_cm"),
+  wt: doublePrecision("wt"), // total weight, g (DMS trait WT)
+  lenSt: doublePrecision("len_st"), // standard length, cm (DMS trait LEN_ST)
 });

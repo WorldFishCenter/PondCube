@@ -1,6 +1,6 @@
 import type { Access } from "./operators";
 import { attempt, browserStorage, removeLocal, writeLocal, type KeyValueStorage } from "./storage";
-import type { RecordKind } from "./validation";
+import { withNewNames, type RecordKind } from "./validation";
 
 // The Outbox: saved Records the server hasn't received yet, one storage key each, removed only once stored.
 
@@ -8,7 +8,7 @@ import type { RecordKind } from "./validation";
 export type WaitingRecord = {
   kind: RecordKind;
   account: string;
-  enumerator: string;
+  person: string;
   record: { id: string; pondCode: string; [field: string]: unknown };
   problem?: string;
 };
@@ -19,11 +19,18 @@ export type Stopped = "offline" | Exclude<Access, object>;
 
 const PREFIX = "pondcube:outbox:";
 
+// Saved before 0.8.0: the Person was `enumerator`, and some fields had other names.
+const withNewNamesWaiting = ({ enumerator, ...w }: WaitingRecord & { enumerator?: string }): WaitingRecord => ({
+  ...w,
+  person: w.person ?? enumerator,
+  record: withNewNames(w.kind, w.record) as WaitingRecord["record"],
+});
+
 /** Every Record waiting on this device, whoever saved it. */
 export const waitingRecords = (storage: KeyValueStorage = browserStorage): WaitingRecord[] =>
   attempt(() => storage.keys(), [])
     .filter((key) => key.startsWith(PREFIX))
-    .flatMap((key) => attempt(() => [JSON.parse(storage.getItem(key) ?? "") as WaitingRecord], []));
+    .flatMap((key) => attempt(() => [withNewNamesWaiting(JSON.parse(storage.getItem(key) ?? ""))], []));
 
 /** `send` posts one Record: to app/api/records in the app, to a fake in scripts/check-outbox.ts. */
 export function createOutbox(

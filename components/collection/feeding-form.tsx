@@ -2,14 +2,15 @@
 
 import { Controller } from "react-hook-form";
 import { feedingForm } from "@/lib/validation";
-import { FEED_TYPES } from "@/lib/options";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { ChoiceField, NotesField, NumberField, RecordCard, type RecordFormProps, useRecordForm } from "./record-form";
+import { FieldGroup } from "@/components/ui/field";
+import { NotesField, NumberField, RecordCard, SelectField, type RecordFormProps, useRecordForm } from "./record-form";
 
-const blank = () => ({ feedType: undefined, feedTypeOther: "", feedAmountKg: "", feedingsCount: "", remarks: "" });
+/** A feed used at the chosen pond's site (DMS FEED). */
+export type Feed = { feed: string; noteFeed: string | null };
 
-export function FeedingForm(props: RecordFormProps) {
+const blank = () => ({ feed: undefined, feedAmountKg: "", feedingsCount: "", remarks: "" });
+
+export function FeedingForm({ feeds, ...props }: RecordFormProps & { feeds: Feed[] }) {
   const { form, card } = useRecordForm({
     kind: "feeding",
     schema: feedingForm,
@@ -20,7 +21,6 @@ export function FeedingForm(props: RecordFormProps) {
   const {
     register,
     control,
-    watch,
     formState: { errors },
   } = form;
 
@@ -34,25 +34,18 @@ export function FeedingForm(props: RecordFormProps) {
     >
       <Controller
         control={control}
-        name="feedType"
+        name="feed"
         render={({ field }) => (
-          <ChoiceField
-            id="fd-type"
-            label="Feed type"
-            options={FEED_TYPES}
+          <SelectField
+            id="fd-feed"
+            label="Feed"
+            placeholder={feeds.length ? "Select a feed" : "No feeds for this site"}
+            options={feeds.map((f) => ({ value: f.feed, label: f.noteFeed ? `${f.feed} · ${f.noteFeed}` : f.feed }))}
             value={field.value}
             onChange={field.onChange}
-            error={errors.feedType}
-            hint="Optional. Tap again to clear."
           />
         )}
       />
-      {watch("feedType") === "other" ? (
-        <Field>
-          <FieldLabel htmlFor="fd-o">Other feed type</FieldLabel>
-          <Input id="fd-o" {...register("feedTypeOther")} />
-        </Field>
-      ) : null}
       <FieldGroup className="grid grid-cols-2 gap-4">
         <NumberField id="fd-a" label="Amount fed" hint="kg" error={errors.feedAmountKg} {...register("feedAmountKg")} />
         <NumberField

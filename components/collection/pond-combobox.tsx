@@ -9,7 +9,7 @@ import {
   ComboboxList,
 } from "@/components/ui/combobox";
 
-export type Pond = { pondCode: string; displayName: string };
+export type Pond = { pondCode: string; displayName: string; site: string };
 
 // Typing filters on "code · name", so both "FT3-091" and "Fish Tank 3" find a pond.
 export function PondCombobox({

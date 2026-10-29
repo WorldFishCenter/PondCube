@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { inArray } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
-import { assets, wqReadings } from "../lib/schema";
+import { pond, wqReadings } from "../lib/schema";
 import { RANGES } from "../lib/validation";
 import { neonTarget, type SyncTarget } from "./sync-airtable";
 
@@ -14,10 +14,10 @@ import { neonTarget, type SyncTarget } from "./sync-airtable";
 //
 // Decided 2026-10-20 (the log has no times or names):
 // - Recorded-at: morning = 08:00, afternoon = 14:00, Penang time.
-// - Enumerator: Mahirah Mahmuddin. App version: "legacy" (app records carry the version that saved them).
+// - Person: Mahirah Mahmuddin. App version: "legacy" (app records carry the version that saved them).
 // - Readings missing dissolved oxygen and/or temperature are kept with blanks; Ranges still apply.
 // - The two values in OUT_OF_RANGE_KEPT are kept as recorded; any other out-of-range value stops the import.
-const ENUMERATOR = "Mahirah Mahmuddin";
+const PERSON = "Mahirah Mahmuddin";
 const TIME = { morning: "08:00", afternoon: "14:00" } as const;
 export const OUT_OF_RANGE_KEPT = [
   "Fish Tank 3|139|2025-07-05|morning|temperature|114",
@@ -54,9 +54,7 @@ export async function prepareImport(
 
   const ponds = new Map(
     (
-      await target.db
-        .select({ code: assets.pondCode, location: assets.legacyLocation, tank: assets.legacyTankId })
-        .from(assets)
+      await target.db.select({ code: pond.pondCode, location: pond.legacyLocation, tank: pond.legacyTankId }).from(pond)
     ).map((p) => [`${p.location}|${p.tank}`, p.code]),
   );
   const problems: string[] = [];
@@ -81,7 +79,7 @@ export async function prepareImport(
       pondCode: pondCode ?? "",
       recordedAt: new Date(`${r.date}T${TIME[r.period as keyof typeof TIME]}:00+08:00`),
       period: r.period,
-      enumerator: ENUMERATOR,
+      person: PERSON,
       appVersion: "legacy",
       remarks: r.remarks || null,
     };

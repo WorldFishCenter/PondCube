@@ -2,6 +2,7 @@ import { ZodError } from "zod";
 import { signedInAccess } from "@/lib/access";
 import { db } from "@/lib/db";
 import { createRecordIntake, neonWriter } from "@/lib/intake";
+import { refusal } from "@/lib/operators";
 import { APP_VERSION } from "@/lib/version";
 
 // Where the Outbox sends each Record: a fixed URL, as a server action's id changes with every deploy.
@@ -16,6 +17,9 @@ export async function POST(request: Request) {
   const { kind, account, record } = await request.json();
   // Signed out, or signed in as someone other than whoever saved it: never stored under their name.
   if (access === "signedOut" || account !== access.account) return new Response(null, { status: 401 });
+  // Only the ponds of the Operator's own sites, and their feeds; refused as this Record's problem, the others still send.
+  const refused = await refusal(db, access.sites, record);
+  if (refused) return new Response(refused, { status: 422 });
   try {
     await intake.save(kind, record, access.operator);
   } catch (err) {
