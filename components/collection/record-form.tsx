@@ -11,23 +11,21 @@ import type { RECORD_KINDS, RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  FieldSet,
-  FieldTitle,
-} from "@/components/ui/field";
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { cn } from "@/lib/utils";
 import type { Outbox } from "./outbox";
 
 type Result = { ok: boolean; title: string; msg: string } | null;
@@ -115,12 +113,14 @@ export function RecordCard({
   onSubmit,
   result,
   pending,
+  action,
   children,
 }: {
   id: string;
   title: string;
   description: string;
   saveLabel: string;
+  action?: React.ReactNode; // beside the title, e.g. a value set from elsewhere
   onSubmit: React.FormEventHandler<HTMLFormElement>;
   result: Result;
   pending: boolean;
@@ -131,6 +131,7 @@ export function RecordCard({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
+        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent>
         {/* noValidate: zod shows every error in the same place instead of native browser bubbles. */}
@@ -294,56 +295,6 @@ export function SelectField({
         </SelectContent>
       </Select>
       <FieldDescription>Optional.</FieldDescription>
-    </Field>
-  );
-}
-
-// The chosen option gets a primary border and a light primary tint (lighter than the filled
-// record-kind tab); the stock pressed state (bg-muted) is the same grey as hover and hard to see.
-const SELECTED_CHOICE =
-  "aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:hover:bg-primary/15 dark:aria-pressed:bg-primary/30 dark:aria-pressed:hover:bg-primary/40";
-
-// Single-choice row of toggles, labelled per the shadcn Field + ToggleGroup pattern.
-export function ChoiceField({
-  id,
-  label,
-  hint,
-  options,
-  value,
-  onChange,
-  error,
-}: {
-  id: string;
-  label: string;
-  hint?: string;
-  options: readonly { value: string; label: string; disabled?: boolean }[];
-  value: string | undefined;
-  onChange: (value: string | undefined) => void;
-  error?: Message;
-}) {
-  return (
-    <Field data-invalid={!!error}>
-      <FieldTitle id={id}>{label}</FieldTitle>
-      <ToggleGroup
-        aria-labelledby={id}
-        aria-invalid={!!error}
-        variant="outline"
-        className="w-full"
-        value={value ? [value] : []}
-        onValueChange={(v) => onChange(v[0])}
-      >
-        {options.map((o) => (
-          <ToggleGroupItem
-            key={o.value}
-            value={o.value}
-            disabled={o.disabled}
-            className={cn("flex-1", SELECTED_CHOICE)}
-          >
-            {o.label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-      {error ? <FieldError errors={[error]} /> : hint ? <FieldDescription>{hint}</FieldDescription> : null}
     </Field>
   );
 }

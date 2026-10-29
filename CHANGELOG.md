@@ -8,7 +8,7 @@ features the second, fixes the third.
 
 ### Changed
 
-- Water quality: the time of day is now set by the date & time at the top, so it can't disagree with it: before noon is morning, from noon on is afternoon.
+- Water quality: the time of day is now set by the date & time at the top, so it can't disagree with it: before noon is morning, from noon on is afternoon. It shows as a small label next to the form's title instead of two buttons.
 - The date & time at the top can no longer be later than now. Future days can't be picked, and a record set later than now isn't saved until you correct it.
 
 ### Fixed
