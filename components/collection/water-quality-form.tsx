@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { RANGES, waterQualityForm } from "@/lib/validation";
-import { PERIODS } from "@/lib/options";
+import { NOON, PERIODS } from "@/lib/options";
 import { Badge } from "@/components/ui/badge";
 import { FieldGroup } from "@/components/ui/field";
 import { NotesField, NumberField, RecordCard, type RecordFormProps, useRecordForm } from "./record-form";
@@ -43,7 +43,7 @@ export function WaterQualityForm(props: RecordFormProps) {
   } = form;
   // The Period is Recorded-at's (before noon: morning), never picked by hand: shown beside the title.
   const time = props.recordedAt.value.split("T")[1];
-  const period = time ? (time < "12:00" ? "morning" : "afternoon") : undefined;
+  const period = time ? (time < NOON ? "morning" : "afternoon") : undefined;
   React.useEffect(() => {
     if (period) setValue("period", period);
   }, [period, setValue]);

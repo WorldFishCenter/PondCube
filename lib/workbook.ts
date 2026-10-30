@@ -4,8 +4,7 @@ import { PERIODS } from "./options";
 import { PROVISIONAL as P } from "./schema";
 import { RANGES } from "./validation";
 
-// The water-quality download: one site, one month, in the shape agreed with Penang (the old log's layout
-// plus a filterable table). docs/architecture.md, "Seeing the data". Column names come from the view.
+// The water-quality download: one site and month, the old log's layout plus a filterable table (docs/architecture.md).
 
 type Reading = Row<"wq">;
 type Pond = Row<"ponds">;
@@ -67,8 +66,8 @@ const OTHERS: Record<Exclude<Column, Param>, { name: string; width: number }> = 
 const info = (c: Column) => (isParam(c) ? PARAMS[c] : { ...OTHERS[c], unit: "" });
 const GRID_KEYS = [...(Object.keys(PARAMS) as Param[]), P.remarks]; // a day's columns on an area tab
 const GRID = GRID_KEYS.length;
-const HALVES = [P.dissolved_oxygen, P.temperature] as const; // averaged per Period
-const WHOLES = [P.ph, P.ammonia, P.nitrite, P.nitrate] as const; // averaged over the month
+const BY_PERIOD = [P.dissolved_oxygen, P.temperature] as const; // averaged per Period
+const BY_MONTH = [P.ph, P.ammonia, P.nitrite, P.nitrate] as const; // averaged over the month
 
 const BOLD = { fontWeight: "bold" } as const;
 const TITLE = { fontWeight: "bold", fontSize: 14 } as const;
@@ -125,11 +124,11 @@ export async function waterQualityWorkbook({
   const dayOf = (day: number) => new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), day));
   const days = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
   const monthName = first.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
-  const round = (r: Reading) => PERIODS.findIndex((p) => p.value === r[P.period]); // the morning round, then the afternoon
+  const periodOrder = (r: Reading) => PERIODS.findIndex((p) => p.value === r[P.period]); // the morning round first
   const readings = monthReadings.toSorted(
     (a, b) =>
       a.date.localeCompare(b.date) ||
-      round(a) - round(b) ||
+      periodOrder(a) - periodOrder(b) ||
       byArea(a[P.area], b[P.area]) ||
       a[P.tank] - b[P.tank] ||
       a.time.localeCompare(b.time),
@@ -253,8 +252,8 @@ export async function waterQualityWorkbook({
   const byPond = groupBy(readings, (r) => r[P.pond_code]);
   const averagesHead = [
     "Tank",
-    ...HALVES.flatMap((p) => ["AM", "PM"].map((half) => `${PARAMS[p].label} ${half}`)), // PERIODS' order
-    ...WHOLES.map((p) => PARAMS[p].label),
+    ...BY_PERIOD.flatMap((p) => ["AM", "PM"].map((half) => `${PARAMS[p].label} ${half}`)), // PERIODS' order
+    ...BY_MONTH.map((p) => PARAMS[p].label),
   ];
   const tankAverages: SheetRow[] = [[{ value: `Average per tank · ${monthName} · empty = no readings`, ...TITLE }]];
   for (const area of areas) {
@@ -264,7 +263,7 @@ export async function waterQualityWorkbook({
       const mine = byPond.get(pond[P.pond_code]) ?? [];
       tankAverages.push([
         pond[P.tank],
-        ...HALVES.flatMap((p) =>
+        ...BY_PERIOD.flatMap((p) =>
           PERIODS.map(({ value: period }) =>
             average(
               mine.filter((r) => r[P.period] === period),
@@ -272,7 +271,7 @@ export async function waterQualityWorkbook({
             ),
           ),
         ),
-        ...WHOLES.map((p) => average(mine, p)),
+        ...BY_MONTH.map((p) => average(mine, p)),
       ]);
     }
   }
@@ -282,7 +281,7 @@ export async function waterQualityWorkbook({
   const dailyAverages: SheetRow[] = [
     [{ value: `Average per area and day · ${monthName} · empty = no readings`, ...TITLE }],
   ];
-  for (const p of HALVES) {
+  for (const p of BY_PERIOD) {
     for (const { value: period, label } of PERIODS) {
       dailyAverages.push(
         [],
@@ -338,6 +337,11 @@ export async function waterQualityWorkbook({
 
 // write-excel-file has neither Excel tables nor cell comments; these add them as its "features" (raw XML parts).
 type Feature = NonNullable<NonNullable<Parameters<typeof writeXlsxFile>[1]>["features"]>[number];
+// A per-sheet insert: `xml` of the sheet's index, or nothing for that sheet.
+const perSheet =
+  (xml: (sheetIndex: number) => string | undefined) =>
+  (_: unknown, { sheetIndex }: { sheetIndex: number }) =>
+    xml(sheetIndex);
 const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const escape = (s: string) =>
@@ -345,10 +349,7 @@ const escape = (s: string) =>
 
 /** An Excel table (filter arrows, banded rows) over `ref` of one sheet. */
 function tableFeature(sheetIndex: number, name: string, ref: string, header: string[]): Feature {
-  const forSheet =
-    (xml: string) =>
-    (_: unknown, { sheetIndex: i }: { sheetIndex: number }) =>
-      i === sheetIndex ? xml : undefined;
+  const forSheet = (xml: string) => perSheet((i) => (i === sheetIndex ? xml : undefined));
   return {
     files: {
       write: {
@@ -375,10 +376,7 @@ function tableFeature(sheetIndex: number, name: string, ref: string, header: str
 /** Cell comments (Excel "notes"), per sheet index; the same parts openpyxl writes, with a VML shape for each. */
 function notesFeature(notes: Map<number, Note[]>): Feature {
   const sheet = (i: number) => i + 1; // file numbers
-  const ifNotes =
-    (xml: (n: number) => string) =>
-    (_: unknown, { sheetIndex }: { sheetIndex: number }) =>
-      notes.has(sheetIndex) ? xml(sheet(sheetIndex)) : undefined;
+  const ifNotes = (xml: (n: number) => string) => perSheet((i) => (notes.has(i) ? xml(sheet(i)) : undefined));
   const shape = (n: number, k: number, { row, col }: Note) =>
     `<v:shape id="_x0000_s${n * 1024 + k + 1}" type="#_x0000_t202" style="position:absolute;margin-left:59.25pt;margin-top:1.5pt;width:144px;height:79px;z-index:1;visibility:hidden" fillcolor="#ffffe1" o:insetmode="auto"><v:fill color2="#ffffe1"/><v:shadow color="black" obscured="t"/><v:path o:connecttype="none"/><v:textbox style="mso-direction-alt:auto"><div style="text-align:left"/></v:textbox><x:ClientData ObjectType="Note"><x:MoveWithCells/><x:SizeWithCells/><x:AutoFill>False</x:AutoFill><x:Row>${row}</x:Row><x:Column>${col}</x:Column></x:ClientData></v:shape>`;
   return {

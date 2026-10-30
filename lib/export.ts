@@ -9,7 +9,6 @@ import { dataLinks, feedingView, mortalityView, pondView, PROVISIONAL as P, samp
 
 type Db = PgDatabase<PgQueryResultHKT>;
 
-/** The views people can read, by the name the routes use. */
 export const VIEWS = {
   wq: wqView,
   feeding: feedingView,
@@ -24,21 +23,18 @@ export type Row<N extends ViewName> =
     ? { [K in keyof F]: F[K] extends SQL.Aliased<infer T> ? T : never }
     : never;
 
-/** A view's column names, in order. */
 export const columnsOf = (name: ViewName) => Object.keys(getViewSelectedFields(VIEWS[name]));
+// Every view has site and pond; all but ponds a date and time (`in` doesn't see through the view's proxy).
+const viewOf = (name: ViewName) => ({ view: VIEWS[name] as typeof wqView, dated: columnsOf(name).includes("date") });
 
-/**
- * Rows of a view from `sites` only: the Operator's, worked out on this request as for recording. The only place
- * rows are filtered by site. `only` narrows to one site and a site-local date prefix (YYYYMM a month, YYYY a year).
- */
+/** The only site filter: rows from the Operator's `sites`; `only` one site and a local YYYYMM or YYYY date. */
 export async function readRows<N extends ViewName>(
   db: Db,
   name: N,
   sites: string[],
   only: { site?: string; date?: string } = {},
 ): Promise<Row<N>[]> {
-  const view = VIEWS[name] as typeof wqView; // every view has site and pond; all but ponds a date and time
-  const dated = columnsOf(name).includes("date"); // `in` doesn't see through the view's proxy
+  const { view, dated } = viewOf(name);
   // ponytail: a date prefix scans the view (to_char can't use an index); filter a recorded_at range once years of
   // history make downloads slow.
   const rows = await db
@@ -57,9 +53,9 @@ export async function readRows<N extends ViewName>(
 
 /** Every row of a view from `sites`, a site-local year at a time, oldest first: a CSV never holds all years at once. */
 export async function* rowsByYear<N extends ViewName>(db: Db, name: N, sites: string[]): AsyncGenerator<Row<N>[]> {
-  if (!columnsOf(name).includes("date")) return yield await readRows(db, name, sites);
-  const view = VIEWS[name] as typeof wqView;
-  // The years of every site: only readRows filters by site, and a year without rows costs an empty read.
+  const { view, dated } = viewOf(name);
+  if (!dated) return yield await readRows(db, name, sites);
+  // Two dates, no rows (so no second site filter): a year without the Operator's rows costs an empty read.
   const [{ first, last }] = await db.select({ first: min(view.date), last: max(view.date) }).from(view);
   if (!first || !last) return;
   for (let year = +first.slice(0, 4); year <= +last.slice(0, 4); year++)

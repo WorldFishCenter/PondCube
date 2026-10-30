@@ -12,6 +12,7 @@ import {
   type AnyPgColumn,
   type PgSelectQueryBuilder,
 } from "drizzle-orm/pg-core";
+import { NOON } from "./options";
 
 // ---- Sites (mirrors the Airtable sites table; WorldFish DMS v5 SITE) ----
 // The DMS requires owner, contact and position too; empty here until they're known.
@@ -159,13 +160,9 @@ export const dataLinks = pgTable("data_links", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// ---- Views for seeing the data: one per Record kind, plus ponds (lib/export.ts reads them) ----
-// Column names are the export headers in lowercase (exports upper-case them): WorldFish DMS v5 names where
-// docs/naming-alignment.md (Status) settles them, PROVISIONAL below for the rest. Legacy rows included.
-// drizzle-kit push creates and drops views but skips a changed definition: drop the view first, then push.
+// ---- Views for seeing the data, columns named as the exports' headers; push skips a changed one: DROP VIEW first ----
 
-/** PROVISIONAL export names (our name → export name): the DMS v5 hasn't settled these (docs/naming-alignment.md,
- * questions 2–14). Data links already serve them: a rename breaks people's Excel queries, to reshape then. */
+/** Export names the DMS v5 hasn't settled (docs/naming-alignment.md): a rename breaks people's Excel queries. */
 export const PROVISIONAL = {
   pond_code: "pond",
   tank: "tank", // the pond code's number
@@ -240,8 +237,8 @@ export const wqView = pgView("export_wq").as((qb) =>
       .select(
         named({
           ...recordFields(wqReadings),
-          // From the site's local hour, as DATE and TIME are, wherever the device was (before noon: morning).
-          [P.period]: sql<string>`case when ${local(wqReadings.recordedAt, "HH24")} < '12' then 'morning' else 'afternoon' end`,
+          // From the site's local hour, as DATE and TIME are, wherever the device was.
+          [P.period]: sql<string>`case when ${local(wqReadings.recordedAt, "HH24")} < ${sql.raw(`'${NOON}'`)} then 'morning' else 'afternoon' end`,
           ...pondFields,
           [P.dissolved_oxygen]: wqReadings.dissolvedOxygen,
           [P.temperature]: wqReadings.temperature,
@@ -249,7 +246,7 @@ export const wqView = pgView("export_wq").as((qb) =>
           [P.ammonia]: wqReadings.ammonia,
           [P.nitrite]: wqReadings.nitrite,
           [P.nitrate]: wqReadings.nitrate,
-          [P.remarks]: sql<string | null>`nullif(${wqReadings.remarks}, '')`, // the app stores a blank remark as ''
+          [P.remarks]: wqReadings.remarks,
           ...madeBy(wqReadings),
         }),
       )

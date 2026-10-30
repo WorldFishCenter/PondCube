@@ -8,8 +8,8 @@ features the second, fixes the third.
 
 ### Added
 
-- "Your data" at the bottom of the screen: download a month of your site's water-quality readings as an Excel file. It has every reading in a table you can filter, one tab per area laid out like the old log (tanks down, days across, morning above afternoon), and averages per tank and per day, ready for charts. Readings outside their plausible range are red; a day with more than one reading shows the latest in yellow (or red), with a note. Readings from the old log are included.
-- A data link: a private key for a spreadsheet that keeps itself up to date, in Excel or Google Sheets, with every record of your site. Keep it like a password. Making a new one stops the old one, and it stops working if you leave the operator list.
+- "Your data" at the bottom of the screen on a tablet or computer: download a month of your site's water-quality readings as an Excel file. It has every reading in a table you can filter, one tab per area laid out like the old log (ponds down, days across, morning above afternoon), and averages per pond and per day, ready for charts. Readings outside their plausible range are red; a day with more than one reading shows the latest in yellow (or red), with a note. Readings from the old log are included.
+- A data link: a private key for a spreadsheet that keeps itself up to date, in Excel or Google Sheets, with every record of your site; the app shows how to add it to either. Keep it, and any sheet you paste it into, like a password. Making a new one stops the old one, and it stops working if you leave the operator list.
 - Dates, times and morning or afternoon in these files follow your site's local time, even for records sent from elsewhere.
 
 ### Changed

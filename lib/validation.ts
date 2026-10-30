@@ -29,6 +29,12 @@ const optNum = (min?: number, max?: number, int = false) => {
   return z.preprocess(toNumber, s.optional());
 };
 
+// A blank note is no note: stored as null, never "".
+const note = z
+  .string()
+  .optional()
+  .transform((v) => (v?.trim() ? v : undefined));
+
 const reqNum = (min: number, max: number, label: string, int = false) => {
   let s = z.number({
     error: (iss) => (iss.input === undefined ? `${label} is required` : `${label} must be a number`),
@@ -77,7 +83,7 @@ export const waterQualityForm = z.object({
   ammonia: optNum(...RANGES.ammonia),
   nitrite: optNum(...RANGES.nitrite),
   nitrate: optNum(...RANGES.nitrate),
-  remarks: z.string().optional(),
+  remarks: note,
 });
 export const waterQualitySchema = waterQualityForm.extend(forSave);
 
@@ -86,7 +92,7 @@ export const feedingForm = z.object({
   feed: z.string().optional(), // a feed of the pond's site: refusal() in lib/operators.ts checks that
   feedAmountKg: reqNum(0, 100000, "Amount fed (kg)"),
   feedingsCount: optNum(0, 100, true),
-  remarks: z.string().optional(),
+  remarks: note,
 });
 export const feedingSchema = feedingForm.extend(forSave);
 
@@ -94,7 +100,7 @@ export const mortalityForm = z.object({
   id: madeAtSave(),
   mortalityCount: reqNum(0, 1000000, "Number of dead fish", true),
   causeDeath: enumOf(CAUSES).optional(),
-  noteDeath: z.string().optional(),
+  noteDeath: note,
 });
 export const mortalitySchema = mortalityForm.extend(forSave);
 
@@ -110,7 +116,7 @@ const fishMeasurements = <Id extends z.ZodType<string>>(id: Id) =>
 
 export const samplingForm = z.object({
   id: madeAtSave(),
-  notes: z.string().optional(),
+  notes: note,
   fish: fishMeasurements(madeAtSave()),
 });
 export const samplingSchema = samplingForm.extend({ ...forSave, fish: fishMeasurements(z.uuid()) });

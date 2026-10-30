@@ -4,34 +4,46 @@ import * as React from "react";
 import { format } from "date-fns";
 import { Check, Copy, Download } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+  FieldTitle,
+} from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
-  InputGroupTextarea,
+  InputGroupText,
 } from "@/components/ui/input-group";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { ViewName } from "@/lib/export";
+import type { RecordKind } from "@/lib/validation";
 import { Choice } from "./record-form";
 
 // Seeing the data (docs/architecture.md): a month of water quality as an Excel file, and a data link of CSVs.
 const MONTHS = 24; // ponytail: the last two years; offer older months when someone asks
 
-export function DataSheet({ sites }: { sites: string[] }) {
+export function DataSheet({ sites, kinds }: { sites: string[]; kinds: Record<RecordKind, { label: string }> }) {
   const yours = sites.length > 1 ? "your sites" : "your site";
   return (
     <Sheet>
-      <SheetTrigger render={<Button variant="link" />}>Your data</SheetTrigger>
+      {/* Tablets and computers only: nobody works with the data on a phone. */}
+      <SheetTrigger render={<Button variant="link" className="hidden md:inline-flex" />}>Your data</SheetTrigger>
       <SheetContent side="bottom" className="max-h-[90svh] overflow-y-auto">
-        <SheetHeader>
+        <SheetHeader className="mx-auto w-full max-w-2xl">
           <SheetTitle>Your data</SheetTitle>
           <SheetDescription>The records of {yours}, from the database.</SheetDescription>
         </SheetHeader>
-        <FieldGroup className="p-4">
+        <FieldGroup className="mx-auto max-w-2xl p-4">
           <ExcelDownload sites={sites} />
           <FieldSeparator />
-          <DataLink yours={yours} />
+          <DataLink yours={yours} labels={{ ...kinds, ponds: { label: "Ponds" } }} />
         </FieldGroup>
       </SheetContent>
     </Sheet>
@@ -70,15 +82,37 @@ function ExcelDownload({ sites }: { sites: string[] }) {
         </FieldDescription>
       </Field>
       <a className={buttonVariants()} href={`/api/download?${new URLSearchParams({ site, month })}`} download>
-        <Download />
+        <Download data-icon="inline-start" />
         Download Excel file
       </a>
     </>
   );
 }
 
-function DataLink({ yours }: { yours: string }) {
-  const [link, setLink] = React.useState<{ key: string; links: string[] }>();
+// Where people put a data link: the steps, and what each Copy button gives them to paste there.
+const APPS = [
+  {
+    name: "Google Sheets",
+    paste: (url: string) => `=IMPORTDATA("${url}")`,
+    steps: [
+      "Open a new sheet in Google Sheets.",
+      "Copy a line below and paste it into cell A1.",
+      "For other records, add a tab and do the same. The sheet updates by itself.",
+    ],
+  },
+  {
+    name: "Excel",
+    paste: (url: string) => url,
+    steps: [
+      "Open a new workbook in Excel for the web.",
+      "Go to Data → Get Data → Web API. Paste a line below, then Load. If asked how to connect, choose Anonymous.",
+      "For other records, do the same again. To update: Data → Refresh All.",
+    ],
+  },
+];
+
+function DataLink({ yours, labels }: { yours: string; labels: Record<ViewName, { label: string }> }) {
+  const [link, setLink] = React.useState<{ key: string; links: Record<ViewName, string> }>();
   const [state, setState] = React.useState<"idle" | "making" | "failed">("idle");
   const make = async () => {
     setState("making");
@@ -93,32 +127,49 @@ function DataLink({ yours }: { yours: string }) {
   };
   return (
     <Field>
-      <FieldLabel>Data link</FieldLabel>
-      <FieldDescription>
-        For a spreadsheet that keeps itself up to date (Excel Power Query or Google Sheets): CSV files of every record
-        at {yours}. Anyone with the key can read them, so keep it like a password. A new link stops the old one.
-      </FieldDescription>
+      <FieldTitle>Data link</FieldTitle>
+      <FieldDescription>The records of {yours} in Google Sheets or Excel, always up to date.</FieldDescription>
       {link && (
         <>
-          <InputGroup>
-            <InputGroupInput aria-label="Key" readOnly value={link.key} />
-            <InputGroupAddon align="inline-end">
-              <CopyButton text={link.key} label="Copy key" />
-            </InputGroupAddon>
-          </InputGroup>
-          <InputGroup>
-            <InputGroupTextarea
-              aria-label="Links"
-              readOnly
-              rows={link.links.length}
-              value={link.links.join("\n")}
-              className="text-xs"
-            />
-            <InputGroupAddon align="block-end">
-              <CopyButton text={link.links.join("\n")} label="Copy links" />
-            </InputGroupAddon>
-          </InputGroup>
-          <FieldDescription>Shown only now. Copy it before closing this.</FieldDescription>
+          <Tabs defaultValue={APPS[0].name}>
+            <TabsList className="w-full">
+              {APPS.map((app) => (
+                <TabsTrigger key={app.name} value={app.name}>
+                  {app.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {APPS.map((app) => (
+              <TabsContent key={app.name} value={app.name} className="flex flex-col gap-3 pt-2">
+                <ol className="list-decimal space-y-1 pl-5 text-sm">
+                  {app.steps.map((step) => (
+                    <li key={step}>{step}</li>
+                  ))}
+                </ol>
+                {Object.entries(link.links).map(([file, url]) => {
+                  const { label } = labels[file as ViewName];
+                  const line = app.paste(url);
+                  return (
+                    <InputGroup key={file}>
+                      <InputGroupInput aria-label={label} readOnly value={line} className="text-xs" />
+                      <InputGroupAddon align="inline-start">
+                        <InputGroupText className="w-24 font-medium text-foreground">{label}</InputGroupText>
+                      </InputGroupAddon>
+                      <InputGroupAddon align="inline-end">
+                        <CopyButton text={line} name={label} />
+                      </InputGroupAddon>
+                    </InputGroup>
+                  );
+                })}
+              </TabsContent>
+            ))}
+          </Tabs>
+          <FieldDescription>Shown only now: copy what you need before closing this.</FieldDescription>
+          <p className="text-xs break-all text-muted-foreground">
+            Keep these lines like a password: anyone with one can see the records. Pasted into a sheet or workbook, the
+            key is in that file too, so share the file only with people who may see them. Making a new link stops the
+            old ones. The key on its own, for a ready-made Excel template: <span className="font-mono">{link.key}</span>
+          </p>
         </>
       )}
       <Button variant="outline" onClick={make} disabled={state === "making"}>
@@ -129,15 +180,15 @@ function DataLink({ yours }: { yours: string }) {
   );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+function CopyButton({ text, name }: { text: string; name: string }) {
   const [copied, setCopied] = React.useState(false);
   return (
     <InputGroupButton
       onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}
-      aria-label={label}
+      aria-label={`Copy ${name}`}
     >
       {copied ? <Check /> : <Copy />}
-      {copied ? "Copied" : label}
+      {copied ? "Copied" : "Copy"}
     </InputGroupButton>
   );
 }

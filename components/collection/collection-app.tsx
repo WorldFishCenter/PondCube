@@ -174,7 +174,7 @@ export function CollectionApp({
         </Tabs>
       )}
       <div className="flex flex-wrap justify-center">
-        <DataSheet sites={sites} />
+        <DataSheet sites={sites} kinds={TABS} />
         <FeedbackSheet operator={person} version={version} />
       </div>
     </Shell>

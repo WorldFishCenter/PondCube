@@ -2,6 +2,8 @@ export const PERIODS = [
   { value: "morning", label: "Morning (AM)" },
   { value: "afternoon", label: "Afternoon (PM)" },
 ] as const;
+// Before noon: morning. Compared with a local "HH" or "HH:mm" text, on the device and in the export view.
+export const NOON = "12";
 
 // WorldFish DMS v5 causes of death (CAUSE_DEATH), in its order, shown as the DMS writes them.
 export const CAUSES = [

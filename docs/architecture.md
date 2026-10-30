@@ -24,7 +24,7 @@ fill a record  ── draft, then ───▶    signed-in operator           o
 
 ## Data model
 
-Five static dimension tables and five event tables, all keyed on `pond_code`.
+Five static dimension tables and five event tables, all keyed on `pond_code`, plus `data_links` and the export views.
 Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 
 - **`site`** — one row per site (WorldFish DMS v5 `SITE`: three-letter `site` code, `name_site`,
@@ -209,17 +209,17 @@ Build files from old deploys stay on the device until `CACHE` in `sw.js` is bump
 
 The database is the only source of truth. Nothing pushes rows into a shared file: every file people get is a
 copy, and corrections are to be made in the app (not built yet). Two ways in, both under "Your data" at the bottom
-of the app.
+of the app, shown from tablet width up (`md`): nobody works with the data on a phone, so a leaked data link is
+stopped from a tablet or computer too.
 
 **What people see: the export views.** One view per Record kind plus ponds (`lib/schema.ts`). Column names are
 the export headers in lowercase (exports upper-case them). They're the WorldFish DMS v5 names where
-`docs/naming-alignment.md` (Status) settles them (`site`, `name_site`, `date`, `time`, `person`, `feed`,
-`cause_death`, `note_death`, `wt`, `len_st`, `species`, `lat_pond`, `long_pond`, `area_pond`, `note_pond`), and
-for everything else the `PROVISIONAL` mapping next to the views: change a name there, once, when Matt answers.
-`date` is the site's local date as `YYYYMMDD` text, `time` its local `HH:MM`, both from the site's `timezone`.
-`period` follows that local time too (before noon: morning), not the Period the device stored, so the three agree
-even for a device set to another time zone. Legacy rows are included (`source` = `legacy`). Sampling is one row per Fish measurement, its event's fields
-repeated, with `sampling_event` grouping them and `measure_event` = `MONITOR` (the DMS v5 measurement event for
+`docs/naming-alignment.md` (Status) settles them, and for everything else the `PROVISIONAL` mapping next to the
+views: change a name there, once, when Matt answers. `date` is the site's local date as `YYYYMMDD` text, `time` its
+local `HH:MM`, both from the site's `timezone`. `period` follows that local time too (morning before `NOON`, the
+device's rule in `lib/options.ts`), not the Period the device stored, so the three agree even for a device set to
+another time zone. Legacy rows are included (`source` = `legacy`). Sampling is one row per Fish measurement, its
+event's fields repeated, with `sampling_event` grouping them and `measure_event` = `MONITOR` (the DMS v5 measurement event for
 routine monitoring of ponds).
 
 **One reader, the only site filter.** `readRows` in `lib/export.ts` reads a view for a list of sites, optionally
@@ -237,10 +237,11 @@ frozen at B4; out-of-range cells red; a day with several readings shows the late
 comment, also where the latest has no value but an earlier one does);
 Tank averages (AM/PM for oxygen and temperature); Daily averages (per area per day, chart-ready). Averages leave
 out-of-range values out. Area tabs follow Penang's old log order (`AREA_ORDER` in `lib/workbook.ts`); other areas
-come after, alphabetically. Built from the July 2025 log, it matches the agreed sample
-(`../PondCube PEN 2025-07 sample.xlsx`) cell for cell, apart from the About wording and averages that are now
-unrounded (shown to two decimals). `npm run check` opens a built file and the sample with openpyxl and compares
-them tab for tab.
+come after, alphabetically. It follows the agreed sample (`../PondCube PEN 2025-07 sample.xlsx`, made from the July
+2025 log), apart from the About wording and averages that are now unrounded (shown to two decimals). `npm run check`
+builds a file from a few test readings and checks key cells against them; when the sample is there, it also
+compares the two with openpyxl tab for tab: names, frozen panes, merged cells, tables and each tab's header rows.
+Nothing checks the rest of the sample cell for cell.
 
 **Way in 2: the data link** (`GET /api/data/{wq,feeding,mortality,sampling,ponds}.csv?key=…`). A secret key per
 sign-in account, made in the app (`POST /api/data-link`) and shown once; `data_links` keeps only its hash. Making
@@ -254,6 +255,11 @@ they get reshaped at that point.
 The key travels in the address (`?key=`), as Excel's "Web API" credential and Google Sheets' `IMPORTDATA` both need.
 So it shows in Vercel's request logs (project team only) and in any "From Web" URL someone pastes. Only its hash is
 stored; a leaked key is stopped by making a new link.
+
+**What the app shows with a new link.** A tab each for Google Sheets and Excel, with a line per CSV to copy:
+`=IMPORTDATA("…")` for cell A1 of a sheet, or the address for Excel for the web (Data → Get Data → Web API, then
+Anonymous). Both put the key in the file, and the app says so: share that file only with people who may see the
+records. The template below keeps the key out of the workbook, on Excel 365 for Windows.
 
 Checked on 2026-10-30:
 
@@ -369,9 +375,10 @@ npm run dev         # http://localhost:3000
    npm run db:sync -- --prod   # sets the new sites, species, feeds and links
    ```
 5. From 0.9.0 to 0.10.0 (seeing the data): add each site's time zone first, since push can't add a required
-   column to a table with rows, then push the views and `data_links`. Applied to the dev branch on 2026-10-30.
-   The file also drops `export_sampling` and `export_wq` if they're there (push skips a changed view). On the dev
-   branch, which had 0.10.0's first `export_wq`: `DROP VIEW export_wq;`, then push.
+   column to a table with rows, then push the views and `data_links`. It sets PEN only, the one site on dev
+   (branched from production): if production has another, add its line, or the file stops and changes nothing. It
+   also turns notes left blank (`''`) into null, as the app saves them from 0.10.0, and drops `export_sampling` and
+   `export_wq` (push skips a changed view). Applied to the dev branch on 2026-10-30.
    ```bash
    psql "$DATABASE_URL_PROD" -f scripts/migrate-0.10.0.sql   # sets PEN to Asia/Kuala_Lumpur
    DATABASE_URL="$DATABASE_URL_PROD" npx drizzle-kit push

@@ -99,8 +99,7 @@ async function main() {
   });
   await db.insert(schema.wqReadings).values([
     reading("PEN-FT1-001", "2025-07-01T00:00:00Z", "morning", { dissolvedOxygen: 3.32, temperature: 28.6 }, "legacy"),
-    // Same day: the latest shows. Remarks left blank in the app are stored as "".
-    reading("PEN-FT1-001", "2025-07-01T01:15:00Z", "morning", { dissolvedOxygen: 3.5, temperature: 28.7, remarks: "" }),
+    reading("PEN-FT1-001", "2025-07-01T01:15:00Z", "morning", { dissolvedOxygen: 3.5, temperature: 28.7 }), // latest shows
     reading("PEN-FT3-091", "2025-07-02T06:00:00Z", "afternoon", { dissolvedOxygen: 5, temperature: 114 }), // out of Range, kept
     reading("PEN-FT2-025", "2025-07-03T00:30:00Z", "morning", { dissolvedOxygen: 5, temperature: 28, ph: 7 }),
     reading("PEN-FT2-025", "2025-07-03T01:30:00Z", "morning", { dissolvedOxygen: 25, temperature: 28 }), // red; no pH
