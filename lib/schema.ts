@@ -249,7 +249,7 @@ export const wqView = pgView("export_wq").as((qb) =>
           [P.ammonia]: wqReadings.ammonia,
           [P.nitrite]: wqReadings.nitrite,
           [P.nitrate]: wqReadings.nitrate,
-          [P.remarks]: wqReadings.remarks,
+          [P.remarks]: sql<string | null>`nullif(${wqReadings.remarks}, '')`, // the app stores a blank remark as ''
           ...madeBy(wqReadings),
         }),
       )
