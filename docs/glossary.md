@@ -21,12 +21,13 @@ row onto exactly one Pond.
 _Avoid_: old code
 
 **Site**
-A place with Ponds, identified by a three-letter code (`SITE` in the WorldFish DMS v3),
-e.g. `PEN` (Batu Maung).
+A place with Ponds, identified by a three-letter code (`SITE` in the WorldFish DMS v5),
+e.g. `PEN` (Batu Maung). Each has a time zone (e.g. `Asia/Kuala_Lumpur`): the dates and times people see
+of its Records are in it.
 _Avoid_: location (the old log's word for an area such as Fish Tank 3)
 
 **Species**
-The species a Pond holds, identified by two uppercase letters (`SPECIES` in the WorldFish DMS v3),
+The species a Pond holds, identified by two uppercase letters (`SPECIES` in the WorldFish DMS v5),
 e.g. `ON` (_Oreochromis niloticus_).
 _Avoid_: strain, species strain
 
@@ -38,7 +39,7 @@ _Avoid_: user, staff
 
 **Person**
 The Operator who made a particular Record (the Operator in the recording role); `PERSON`
-in the WorldFish DMS v3.
+in the WorldFish DMS v5.
 _Avoid_: enumerator, author, creator
 
 **Who & where**
@@ -68,7 +69,7 @@ Recorded-at hour (before noon: morning), never picked by hand.
 _Avoid_: shift, session
 
 **Feed**
-A feed used at a Site, identified by three characters (`FEED` in the WorldFish DMS v3), e.g. `SUP`;
+A feed used at a Site, identified by three characters (`FEED` in the WorldFish DMS v5), e.g. `SUP`;
 each Site has its own list.
 _Avoid_: feed type
 
@@ -77,7 +78,7 @@ An amount of feed given to a Pond, optionally with the Feed used and number of f
 _Avoid_: feed log
 
 **Mortality record**
-A count of dead fish removed from a Pond, optionally with a cause of death (one of the DMS's four).
+A count of dead fish removed from a Pond, optionally with a cause of death (one of the DMS's eleven).
 _Avoid_: death event, loss
 
 **Sampling event**
@@ -116,3 +117,20 @@ Accepting a Record into the PondCube dataset: checked against its Ranges and sto
 whole or not at all (a Sampling event never without its Fish measurements). A Record
 sent twice (its first reply was lost) is stored once.
 _Avoid_: submission handling, insert
+
+## Seeing the data
+
+**Water-quality download**
+An Excel file of one Site's Water-quality readings for one month, laid out like the old log, made from the
+database when asked for. A copy: changes made in it never reach the database.
+_Avoid_: report, sync
+
+**Data link**
+A secret key that lets a spreadsheet (Excel Power Query, Google Sheets) read CSV files of every Record at the
+Operator's Sites, current each time it's read. One per sign-in account; making a new one stops the old one.
+_Avoid_: API key, token, share link
+
+**Provisional name**
+An export column name the WorldFish DMS v5 hasn't settled yet (e.g. `TANK`, `DISSOLVED_OXYGEN`), listed in one
+place so it can change once when the DMS settles it.
+_Avoid_: alias, temporary column

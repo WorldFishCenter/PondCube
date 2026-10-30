@@ -74,6 +74,12 @@ const siteRow = z
     lat_site: number,
     long_site: number,
     note_site: optional,
+    // Named zones only: Postgres reads an offset like +08:00 with its sign flipped.
+    timezone: required.pipe(
+      z.string().refine((tz) => Intl.supportedValuesOf("timeZone").includes(tz), {
+        error: "is not an IANA time zone, e.g. Asia/Kuala_Lumpur",
+      }),
+    ),
   })
   .transform((r) => ({
     id: r.id,
@@ -86,6 +92,7 @@ const siteRow = z
       latSite: r.lat_site,
       longSite: r.long_site,
       noteSite: r.note_site,
+      timezone: r.timezone,
     } satisfies Site,
   }));
 

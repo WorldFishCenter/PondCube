@@ -33,6 +33,7 @@ async function App() {
     <CollectionApp
       person={access.operator}
       account={access.account}
+      sites={access.sites}
       ponds={ponds}
       feeds={feeds}
       version={APP_VERSION}

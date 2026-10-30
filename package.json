@@ -1,6 +1,6 @@
 {
   "name": "pondcube-app",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "tsx scripts/check-validation.ts && tsx scripts/check-draft.ts && tsx scripts/check-outbox.ts && tsx scripts/check-intake.ts && tsx scripts/check-sync.ts && tsx scripts/check-access.ts && tsx scripts/check-import.ts",
+    "check": "tsx scripts/check-validation.ts && tsx scripts/check-draft.ts && tsx scripts/check-outbox.ts && tsx scripts/check-intake.ts && tsx scripts/check-sync.ts && tsx scripts/check-access.ts && tsx scripts/check-import.ts && tsx scripts/check-export.ts && tsx scripts/check-workbook.ts",
     "db:push": "drizzle-kit push",
     "db:sync": "tsx scripts/sync-airtable.ts",
     "db:sync-ponds": "tsx scripts/sync-airtable.ts ponds",
@@ -36,6 +36,7 @@
     "react-hook-form": "^7.89.0",
     "shadcn": "^4.21.4",
     "tw-animate-css": "^1.4.0",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

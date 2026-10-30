@@ -36,9 +36,9 @@ async function main() {
 
   // An Operator records only the ponds of their sites, with a feed used there.
   await db.insert(schema.site).values([
-    { site: "PEN", nameSite: "Batu Maung" },
-    { site: "TAL", nameSite: "Talbaria" },
-    { site: "KOT", nameSite: "Kotalipara" },
+    { site: "PEN", nameSite: "Batu Maung", timezone: "Asia/Kuala_Lumpur" },
+    { site: "TAL", nameSite: "Talbaria", timezone: "Asia/Dhaka" },
+    { site: "KOT", nameSite: "Kotalipara", timezone: "Asia/Dhaka" },
   ]);
   const pond = { displayName: "1", area: "A", areaCode: "A", zone: "A", unitType: "tank" };
   await db.insert(schema.pond).values([

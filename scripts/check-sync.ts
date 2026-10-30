@@ -38,7 +38,7 @@ async function main() {
       }),
   };
   // Airtable's sites table comes with every sync (ponds and operators link to it).
-  const pen = { id: "recPEN", site: "pen", name_site: "Batu Maung" };
+  const pen = { id: "recPEN", site: "pen", name_site: "Batu Maung", timezone: "Asia/Kuala_Lumpur" };
   const withSites = (rows: AirtableRows) => ({ sites: [pen], ...rows });
   const prepared = async (rows: AirtableRows) => {
     const sync = await prepareSync(withSites(rows), target);
@@ -85,6 +85,10 @@ async function main() {
   );
   await fails({ species: [nile], ponds: [pond("PEN-FT1-001", { species: ["recON", "recON"] })] }, /one row of species/);
   await fails({ sites: [{ ...pen, site: "PENA" }] }, /should be three letters/);
+  // The export turns instants into the site's local DATE and TIME.
+  await fails({ sites: [{ ...pen, timezone: undefined }] }, /timezone is empty/);
+  await fails({ sites: [{ ...pen, timezone: "Penang" }] }, /timezone is not an IANA time zone/);
+  await fails({ sites: [{ ...pen, timezone: "+08:00" }] }, /timezone is not an IANA time zone/); // Postgres flips the sign
   await fails({ ponds: [pond("PEN-FT1-001", { site: ["recXX"] })] }, /should link to one row of sites/);
   await fails({ operators: [op("Ana", { site: ["recXX"] })] }, /should link to rows of sites/);
   await fails({ operators: [{ name: "Ana", active: true }] }, /Ana has no site/); // would see no ponds
@@ -103,6 +107,7 @@ async function main() {
   assert.equal((await operator("Cy"))?.active, false, "unticked = inactive");
   assert.equal((await pondRow("PEN-FT1-001"))?.site, "PEN", "site link resolved to the code, upper-cased");
   assert.deepEqual((await operator("Ana"))?.sites, ["PEN"]);
+  assert.equal((await db.select().from(schema.site))[0]?.timezone, "Asia/Kuala_Lumpur");
 
   // A record references PEN-FT1-002; then it's removed from Airtable and Ben leaves.
   await db.insert(schema.mortalityEvents).values({
@@ -162,7 +167,7 @@ async function main() {
   assert.equal((await pondRow("PEN-FT1-002"))?.status, "active", "pond not retired by a failed sync");
 
   // Some people work at several sites.
-  const tal = { id: "recTAL", site: "TAL", name_site: "Talbaria" };
+  const tal = { id: "recTAL", site: "TAL", name_site: "Talbaria", timezone: "Asia/Dhaka" };
   await synced({ sites: [pen, tal], operators: [{ name: "Dee", active: true, site: ["recPEN", "recTAL"] }] });
   assert.deepEqual((await operator("Dee"))?.sites, ["PEN", "TAL"]);
 

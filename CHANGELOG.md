@@ -4,6 +4,18 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.10.0] - 2026-10-30
+
+### Added
+
+- "Your data" at the bottom of the screen: download a month of your site's water-quality readings as an Excel file. It has every reading in a table you can filter, one tab per area laid out like the old log (tanks down, days across, morning above afternoon), and averages per tank and per day, ready for charts. Readings outside their plausible range are red; a day with more than one reading shows the latest in yellow (or red), with a note. Readings from the old log are included.
+- A data link: a private key for a spreadsheet that keeps itself up to date, in Excel or Google Sheets, with every record of your site. Keep it like a password. Making a new one stops the old one, and it stops working if you leave the operator list.
+- Dates, times and morning or afternoon in these files follow your site's local time, even for records sent from elsewhere.
+
+### Changed
+
+- The app now follows the 2025 edition of WorldFish's shared data standard. Causes of death are its eleven, as it writes them: plain "Cull" is replaced by four kinds of cull (after the harvest measurement, after mating, final, other), and handling, measurement, tagging deaths and missing fish now have their own cause. In your data files, samplings are marked as routine pond monitoring.
+
 ## [0.9.0] - 2026-10-29
 
 ### Changed

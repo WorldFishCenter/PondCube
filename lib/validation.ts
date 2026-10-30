@@ -16,8 +16,8 @@ export const RANGES = {
   ammonia: [0, 100],
   nitrite: [0, 100],
   nitrate: [0, 500],
-  wt: [0, 20000], // DMS v3 trait WT, g
-  lenSt: [0, 100], // DMS v3 trait LEN_ST, cm
+  wt: [0, 20000], // DMS trait WT, g (Range from the v3 trait table)
+  lenSt: [0, 100], // DMS v5 trait LEN_ST, cm
 } as const;
 
 // Optional decimal. int: counts map to integer DB columns, so reject decimals here rather than at insert.
@@ -124,10 +124,11 @@ export const RECORD_KINDS = {
 } as const;
 export type RecordKind = keyof typeof RECORD_KINDS;
 
-// Drafts and Outbox Records saved before 0.8.0 carry the fields' earlier names: read them under the DMS v3 ones.
+// Drafts and Outbox Records saved before 0.8.0 carry the fields' earlier names: read them under the DMS v5 ones.
 // A value with no new field (an old feed type, an old cause the DMS lacks) goes in the note, as in the database.
 const OLD_CAUSES: Record<string, string> = {
   disease: "Disease_parasites",
+  handling: "Handling_mortality",
   water_quality: "Water_quality",
   unknown: "Unknown",
 };

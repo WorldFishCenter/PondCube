@@ -276,25 +276,46 @@ export function SelectField({
   value: string | undefined;
   onChange: (value: string | undefined) => void;
 }) {
-  const items = [{ value: null, label: placeholder }, ...options];
   return (
     <Field>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Select items={items} value={value ?? null} onValueChange={(v) => onChange(v ?? undefined)}>
-        <SelectTrigger id={id}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {items.map((item) => (
-              <SelectItem key={item.value ?? "none"} value={item.value}>
-                {item.label}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      <Choice
+        id={id}
+        items={[{ value: null, label: placeholder }, ...options]}
+        value={value ?? null}
+        onChange={(v) => onChange(v ?? undefined)}
+      />
       <FieldDescription>Optional.</FieldDescription>
     </Field>
+  );
+}
+
+// A pick from a list, per Base UI Select.
+export function Choice({
+  id,
+  items,
+  value,
+  onChange,
+}: {
+  id: string;
+  items: readonly { value: string | null; label: string }[];
+  value: string | null;
+  onChange: (value: string | null) => void;
+}) {
+  return (
+    <Select items={items} value={value} onValueChange={onChange}>
+      <SelectTrigger id={id}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {items.map((item) => (
+            <SelectItem key={item.value ?? "none"} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
   );
 }

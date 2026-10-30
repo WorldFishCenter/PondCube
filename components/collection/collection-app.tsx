@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PondCubeLogo } from "@/components/pondcube-logo";
 import { useKeepForOffline } from "@/components/service-worker";
+import { DataSheet } from "./data-sheet";
 import { FeedbackSheet } from "./feedback-sheet";
 import { OutboxAlert, useOutbox } from "./outbox";
 import { PondCombobox, type Pond } from "./pond-combobox";
@@ -75,12 +76,14 @@ export function CollectionSkeleton() {
 export function CollectionApp({
   person,
   account,
+  sites,
   ponds,
   feeds,
   version,
 }: {
   person: string;
   account: string;
+  sites: string[];
   ponds: Pond[];
   feeds: (Feed & { sites: string[] })[];
   version: string;
@@ -170,7 +173,10 @@ export function CollectionApp({
           ))}
         </Tabs>
       )}
-      <FeedbackSheet operator={person} version={version} />
+      <div className="flex flex-wrap justify-center">
+        <DataSheet sites={sites} />
+        <FeedbackSheet operator={person} version={version} />
+      </div>
     </Shell>
   );
 }

@@ -31,7 +31,7 @@ async function main() {
     return intake.save(kind, sent, "Operator 1");
   };
 
-  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung" });
+  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung", timezone: "Asia/Kuala_Lumpur" });
   await db.insert(schema.pond).values({
     pondCode: "PEN-FT1-001",
     displayName: "Fish Tank 1 - #1",
