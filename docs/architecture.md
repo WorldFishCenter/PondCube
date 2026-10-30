@@ -24,13 +24,14 @@ fill a record  ── draft, then ───▶    signed-in operator           o
 
 ## Data model
 
-Five static dimension tables and five event tables, all keyed on `pond_code`.
+Five static dimension tables and five event tables, all keyed on `pond_code`, plus `data_links` and the export views.
 Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 
-- **`site`** — one row per site (WorldFish DMS v3 `SITE`: three-letter `site` code, `name_site`,
-  owner, contact, position), mirroring the Airtable `sites` table. Never removed from Neon.
+- **`site`** — one row per site (WorldFish DMS v5 `SITE`: three-letter `site` code, `name_site`,
+  owner, contact, position), mirroring the Airtable `sites` table. Never removed from Neon. Also its `timezone`
+  (IANA, e.g. `Asia/Kuala_Lumpur`; not in the DMS), which the exports use for local dates and times.
 - **`pond`** — one row per Pond. Mirrors the Airtable `ponds` table (see below). Where the
-  WorldFish DMS v3 names a field, the column (and the Airtable field) uses that name: `site`,
+  WorldFish DMS v5 names a field, the column (and the Airtable field) uses that name: `site`,
   `lat_pond`, `long_pond`, `area_pond` (hectares), `note_pond` (see `docs/naming-alignment.md`).
   Carries `legacy_location` + `legacy_tank_id` so converted historical rows map onto today's pond
   codes. Its `site` points to a row of `site`, its `species` to a row of `species`.
@@ -50,6 +51,9 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 - **`sampling_events` + `fish_measurements`** — header/detail: a sampling event owns
   one or more fish measurements (cascade delete). Intake writes them together or
   not at all.
+- **`data_links`** — one row per sign-in account that has a data link: the SHA-256 of its key, never the key.
+- **Views `export_wq`, `export_feeding`, `export_mortality`, `export_sampling`, `export_pond`** — what people
+  see of the data, in export names (see [Seeing the data](#seeing-the-data)).
 
 ## Infrastructure
 
@@ -80,7 +84,8 @@ of record the app reads and writes. The flow is one-way:
 **Airtable → `npm run db:sync` → Neon `site` / `species` / `feed` / `pond` / `operators`** (or
 `db:sync-ponds`, which brings species with it, and `db:sync-operators`; sites come with both).
 Ponds and operators link to `sites`, ponds to `species`: the sync turns each link into the code,
-and stops if a link points nowhere or an active operator has no site. It upserts, so re-run it
+and stops if a link points nowhere, an active operator has no site, or a site's `timezone` is missing or isn't
+an IANA name (an offset like `+08:00` is refused: Postgres reads it with the sign flipped). It upserts, so re-run it
 after edits. Never edit ponds or operators directly in Neon. Feeds removed from Airtable stay in Neon
 for the Records that use them, but are offered nowhere.
 
@@ -200,6 +205,119 @@ the next load with signal (saves are always checked against whoever is signed in
 Build files from old deploys stay on the device until `CACHE` in `sw.js` is bumped.
 `next.config.ts` also sets the Next.js PWA guide's security headers on every page.
 
+## Seeing the data
+
+The database is the only source of truth. Nothing pushes rows into a shared file: every file people get is a
+copy, and corrections are to be made in the app (not built yet). Two ways in, both under "Your data" at the bottom
+of the app, shown from tablet width up (`md`): nobody works with the data on a phone, so a leaked data link is
+stopped from a tablet or computer too.
+
+**What people see: the export views.** One view per Record kind plus ponds (`lib/schema.ts`). Column names are
+the export headers in lowercase (exports upper-case them). They're the WorldFish DMS v5 names where
+`docs/naming-alignment.md` (Status) settles them, and for everything else the `PROVISIONAL` mapping next to the
+views: change a name there, once, when Matt answers. `date` is the site's local date as `YYYYMMDD` text, `time` its
+local `HH:MM`, both from the site's `timezone`. `period` follows that local time too (morning before `NOON`, the
+device's rule in `lib/options.ts`), not the Period the device stored, so the three agree even for a device set to
+another time zone. Legacy rows are included (`source` = `legacy`). Sampling is one row per Fish measurement, its
+event's fields repeated, with `sampling_event` grouping them and `measure_event` = `MONITOR` (the DMS v5 measurement event for
+routine monitoring of ponds).
+
+**One reader, the only site filter.** `readRows` in `lib/export.ts` reads a view for a list of sites, optionally
+narrowed to one site and one month (or year). Every route passes it the Operator's sites, worked out on that
+request the same way as recording (`accessFor` + `operators.sites`), so another site's rows never come through,
+and a deactivated Operator gets nothing within about a minute (the operator lookup is cached, as for recording).
+Nothing else filters rows by site.
+
+**Way in 1: the water-quality download** (`GET /api/download?site=PEN&month=2025-07`, signed in, both required).
+One site and one month as an `.xlsx` (`lib/workbook.ts`, written with write-excel-file plus two small "features" for the
+Excel table and the cell comments). Tabs: About (how to read it, column meanings and units); Readings (one row
+per reading, an Excel table with filters, DATE a real date shown `yyyymmdd`); one tab per area in the old log's
+layout (tanks down, including tanks without readings; days across in 7-column blocks; morning above afternoon;
+frozen at B4; out-of-range cells red; a day with several readings shows the latest in yellow, or red, with a
+comment, also where the latest has no value but an earlier one does);
+Tank averages (AM/PM for oxygen and temperature); Daily averages (per area per day, chart-ready). Averages leave
+out-of-range values out. Area tabs follow Penang's old log order (`AREA_ORDER` in `lib/workbook.ts`); other areas
+come after, alphabetically. It follows the agreed sample (`../PondCube PEN 2025-07 sample.xlsx`, made from the July
+2025 log), apart from the About wording and averages that are now unrounded (shown to two decimals). `npm run check`
+builds a file from a few test readings and checks key cells against them; when the sample is there, it also
+compares the two with openpyxl tab for tab: names, frozen panes, merged cells, tables and each tab's header rows.
+Nothing checks the rest of the sample cell for cell.
+
+**Way in 2: the data link** (`GET /api/data/{wq,feeding,mortality,sampling,ponds}.csv?key=…`). A secret key per
+sign-in account, made in the app (`POST /api/data-link`) and shown once; `data_links` keeps only its hash. Making
+a new one replaces the old, which stops working. Each request looks the key's account up in Clerk and runs it
+through `accessFor`, so the CSVs follow the operator list: removed, deactivated or moved to another site, and the
+link changes with it. Every row of the Operator's sites, all months, read and streamed a site-local year at a time
+(`rowsByYear`), so memory holds one year, not the whole history. Links are open to every Operator before Matt has
+answered the naming questions (decided 2026-10-30): a rename then breaks the queries built on the old name, and
+they get reshaped at that point.
+
+The key travels in the address (`?key=`), as Excel's "Web API" credential and Google Sheets' `IMPORTDATA` both need.
+So it shows in Vercel's request logs (project team only) and in any "From Web" URL someone pastes. Only its hash is
+stored; a leaked key is stopped by making a new link.
+
+**What the app shows with a new link.** A tab each for Google Sheets and Excel, with a line per CSV to copy:
+`=IMPORTDATA("…")` for cell A1 of a sheet, or the address for Excel for the web (Data → Get Data → Web API, then
+Anonymous). Both put the key in the file, and the app says so: share that file only with people who may see the
+records. The template below keeps the key out of the workbook, on Excel 365 for Windows.
+
+Checked on 2026-10-30:
+
+- **Vercel's 4.5 MB response limit.** The limits page states 4.5 MB for "the request body or the response body"
+  and doesn't mention streaming; Vercel's knowledge base article on that limit (updated 2025-11-10) recommends
+  "streaming functions, which don't have this limit". The CSVs are streamed (`Transfer-Encoding: chunked`); one
+  month of Penang water quality is 417 KB, so a site-year is about 5 MB. Not yet tried on Vercel: before relying
+  on it, fetch a CSV of more than 4.5 MB from a preview deploy.
+- **drizzle-kit push and views.** Push creates new views and drops removed ones, but skips a changed definition
+  (`drizzle-kit` 0.31.11 only re-creates altered views outside push). To change a view: `DROP VIEW` it, then push.
+  Postgres also refuses to change a column a view uses: drop the view first there too.
+- **Excel's "Web API" credential.** With `Web.Contents(url, [ApiKeyName = "key"])`, Power Query adds the key from
+  the credential to the URL; Microsoft's `Web.Contents` reference describes exactly this to avoid "hard-coding
+  the secret key in M". Credentials live in Power Query's own store (Data → Get Data → Data Source Settings →
+  Global permissions), per user on that computer, not in the workbook. Pasting a URL that contains `?key=` into
+  "From Web" does put the key in the workbook. Not checked: Excel for Mac, whose Power Query may not offer Web API
+  credentials.
+
+### Building the Excel template (Power Query)
+
+For Excel 365 on Windows. Each person who refreshes it needs their own data link: the key isn't in the file.
+
+1. In the app, "Your data" → "Make a data link". Copy the key.
+2. Excel → Data → Get Data → From Other Sources → Blank Query → Advanced Editor. Paste, with the app's address:
+   ```
+   let
+       Source = Csv.Document(
+           Web.Contents("https://<app address>/api/data/wq.csv", [ApiKeyName = "key"]),
+           [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+       Headers = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+       Typed = Table.TransformColumnTypes(Headers, {
+           {"TANK", Int64.Type}, {"DISSOLVED_OXYGEN", type number}, {"TEMPERATURE", type number},
+           {"PH", type number}, {"AMMONIA", type number}, {"NITRITE", type number}, {"NITRATE", type number}},
+           "en-US"),
+       Day = Table.AddColumn(Typed, "DAY", each #date(
+           Number.From(Text.Start([DATE], 4)), Number.From(Text.Middle([DATE], 4, 2)),
+           Number.From(Text.End([DATE], 2))), type date)
+   in
+       Day
+   ```
+   `"en-US"` reads decimals with a point whatever the computer's language. DATE stays `YYYYMMDD` text; DAY is the
+   same date as a real date, for pivots and charts.
+3. When Excel asks how to connect: Web API, paste the key, set the level to the app's address, Connect.
+4. Name the query `wq`, then Close & Load To → Table, on a new sheet. Repeat for `feeding`, `mortality`,
+   `sampling` and `ponds` (right-click the query → Duplicate, change the file name; type their number columns
+   the same way).
+5. Tank × day, one per period: Insert → PivotTable from the `wq` table. Filters: AREA, PERIOD; Rows: TANK;
+   Columns: DAY (right-click → Ungroup, so each day is its own column); Values: Average of DISSOLVED_OXYGEN and
+   Average of TEMPERATURE. Set PERIOD to morning; copy the pivot and set the copy to afternoon.
+6. Daily average per area: another PivotTable from `wq`. Filters: PERIOD; Rows: DAY; Columns: AREA; Values:
+   Average of TEMPERATURE (or DISSOLVED_OXYGEN). Insert → PivotChart → Line. Add slicers for PERIOD and AREA.
+7. Data → Refresh All brings everything up to date (Query Properties → "Refresh data when opening the file"
+   does it on open). To start over with a new key: Data Source Settings → Global permissions → the app's
+   address → Edit Permissions → Edit.
+
+Google Sheets: `=IMPORTDATA("https://<app address>/api/data/wq.csv?key=<key>")`. The key is then in the sheet, so
+anyone who can open the sheet can read the data.
+
 ## Roadmap / open decisions
 
 - **Mandible sensor data** lands in the same Neon database in its own table(s).
@@ -255,4 +373,14 @@ npm run dev         # http://localhost:3000
    ```bash
    psql "$DATABASE_URL_PROD" -f scripts/migrate-0.8.0.sql
    npm run db:sync -- --prod   # sets the new sites, species, feeds and links
+   ```
+5. From 0.9.0 to 0.10.0 (seeing the data): add each site's time zone first, since push can't add a required
+   column to a table with rows, then push the views and `data_links`. It sets PEN only, the one site on dev
+   (branched from production): if production has another, add its line, or the file stops and changes nothing. It
+   also turns notes left blank (`''`) into null, as the app saves them from 0.10.0, and drops `export_sampling` and
+   `export_wq` (push skips a changed view). Applied to the dev branch on 2026-10-30.
+   ```bash
+   psql "$DATABASE_URL_PROD" -f scripts/migrate-0.10.0.sql   # sets PEN to Asia/Kuala_Lumpur
+   DATABASE_URL="$DATABASE_URL_PROD" npx drizzle-kit push
+   npm run db:sync -- --prod   # from now on the zone comes from Airtable's sites.timezone
    ```

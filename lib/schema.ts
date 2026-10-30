@@ -1,6 +1,20 @@
-import { pgTable, text, integer, doublePrecision, timestamp, date, boolean, uuid } from "drizzle-orm/pg-core";
+import { eq, sql, type Column, type SQL } from "drizzle-orm";
+import {
+  pgTable,
+  pgView,
+  text,
+  integer,
+  doublePrecision,
+  timestamp,
+  date,
+  boolean,
+  uuid,
+  type AnyPgColumn,
+  type PgSelectQueryBuilder,
+} from "drizzle-orm/pg-core";
+import { NOON } from "./options";
 
-// ---- Sites (mirrors the Airtable sites table; WorldFish DMS v3 SITE) ----
+// ---- Sites (mirrors the Airtable sites table; WorldFish DMS v5 SITE) ----
 // The DMS requires owner, contact and position too; empty here until they're known.
 export const site = pgTable("site", {
   site: text("site").primaryKey(), // three uppercase letters, e.g. PEN
@@ -11,16 +25,17 @@ export const site = pgTable("site", {
   latSite: doublePrecision("lat_site"),
   longSite: doublePrecision("long_site"),
   noteSite: text("note_site"),
+  timezone: text("timezone").notNull(), // IANA, e.g. Asia/Kuala_Lumpur: the exports' local DATE and TIME. Not in the DMS
 });
 
-// ---- Species (mirrors the Airtable species table; WorldFish DMS v3 SPECIES) ----
+// ---- Species (mirrors the Airtable species table; WorldFish DMS v5 SPECIES) ----
 export const species = pgTable("species", {
   species: text("species").primaryKey(), // two uppercase letters, e.g. ON
   speciesLatin: text("species_latin").notNull().unique(),
   speciesCommon: text("species_common"),
 });
 
-// ---- Feeds (mirrors the Airtable feeds table; WorldFish DMS v3 FEED) ----
+// ---- Feeds (mirrors the Airtable feeds table; WorldFish DMS v5 FEED) ----
 export const feed = pgTable("feed", {
   feed: text("feed").primaryKey(), // three characters, e.g. SUP
   noteFeed: text("note_feed"),
@@ -28,7 +43,7 @@ export const feed = pgTable("feed", {
   sites: text("sites").array().notNull(), // the sites that use it
 });
 
-// ---- Ponds (mirrors the Airtable ponds table; WorldFish DMS v3 names where it has one) ----
+// ---- Ponds (mirrors the Airtable ponds table; WorldFish DMS v5 names where it has one) ----
 export const pond = pgTable("pond", {
   pondCode: text("pond_code").primaryKey(), // e.g. PEN-FT3-091
   displayName: text("display_name").notNull(),
@@ -137,3 +152,198 @@ export const fishMeasurements = pgTable("fish_measurements", {
   wt: doublePrecision("wt"), // total weight, g (DMS trait WT)
   lenSt: doublePrecision("len_st"), // standard length, cm (DMS trait LEN_ST)
 });
+
+// ---- Data links: one secret key per sign-in account, for CSVs in Excel (Power Query) or Google Sheets ----
+export const dataLinks = pgTable("data_links", {
+  account: text("account").primaryKey(), // Clerk user id; a new key replaces (so revokes) the old one
+  keyHash: text("key_hash").notNull().unique(), // SHA-256 of the key: the key itself is shown once, never stored
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---- Views for seeing the data, columns named as the exports' headers; push skips a changed one: DROP VIEW first ----
+
+/** Export names the DMS v5 hasn't settled (docs/naming-alignment.md): a rename breaks people's Excel queries. */
+export const PROVISIONAL = {
+  pond_code: "pond",
+  tank: "tank", // the pond code's number
+  source: "source", // app, or legacy (the old Excel log)
+  area: "area",
+  period: "period",
+  dissolved_oxygen: "dissolved_oxygen",
+  temperature: "temperature",
+  ph: "ph",
+  ammonia: "ammonia",
+  nitrite: "nitrite",
+  nitrate: "nitrate",
+  remarks: "remarks",
+  feed_amount_kg: "feed_amount_kg",
+  feedings_count: "feedings_count",
+  mortality_count: "mortality_count",
+  sampling_event: "sampling_event", // the Sampling event's id, shared by its Fish measurements
+  notes: "notes",
+  display_name: "display_name",
+  area_code: "area_code",
+  zone: "zone",
+  unit_type: "unit_type",
+  status: "status",
+  legacy_location: "legacy_location",
+  legacy_tank_id: "legacy_tank_id",
+  volume_m3: "volume_m3",
+  depth_m: "depth_m",
+  water_source: "water_source",
+  commissioned_date: "commissioned_date",
+} as const;
+const P = PROVISIONAL;
+
+type Named<T> = {
+  [K in keyof T]: SQL.Aliased<
+    T[K] extends SQL<infer U>
+      ? U
+      : T[K] extends Column
+        ? T[K]["_"]["data"] | (T[K]["_"]["notNull"] extends true ? never : null)
+        : never
+  >;
+};
+// Each field becomes a view column named by its key, so rows come back keyed by column name.
+const named = <T extends Record<string, SQL | Column>>(fields: T) =>
+  Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, sql`${field}`.as(name)])) as Named<T>;
+
+// DMS dates are YYYYMMDD text; DATE and TIME are the site's local date and time.
+const local = (at: AnyPgColumn, format: string) =>
+  sql<string>`to_char(${at} at time zone ${site.timezone}, ${sql.raw(`'${format}'`)})`;
+// The fields every Record view starts with.
+const recordFields = (t: { recordedAt: AnyPgColumn }) => ({
+  site: pond.site,
+  date: local(t.recordedAt, "YYYYMMDD"),
+  time: local(t.recordedAt, "HH24:MI"),
+});
+const pondFields = {
+  [P.area]: pond.area,
+  [P.tank]: sql<number>`right(${pond.pondCode}, 3)::int`,
+  [P.pond_code]: pond.pondCode,
+};
+// The fields every Record view ends with (sampling's then adds its fish).
+const madeBy = <C extends AnyPgColumn>(t: { person: C; appVersion: AnyPgColumn }) => ({
+  person: t.person,
+  [P.source]: sql<string>`case when ${t.appVersion} = 'legacy' then 'legacy' else 'app' end`,
+});
+// Every Record view reads its Record's pond and that pond's site.
+const atPond = <Q extends PgSelectQueryBuilder>(q: Q, pondCode: AnyPgColumn) =>
+  q.innerJoin(pond, eq(pond.pondCode, pondCode)).innerJoin(site, eq(site.site, pond.site));
+
+export const wqView = pgView("export_wq").as((qb) =>
+  atPond(
+    qb
+      .select(
+        named({
+          ...recordFields(wqReadings),
+          // From the site's local hour, as DATE and TIME are, wherever the device was.
+          [P.period]: sql<string>`case when ${local(wqReadings.recordedAt, "HH24")} < ${sql.raw(`'${NOON}'`)} then 'morning' else 'afternoon' end`,
+          ...pondFields,
+          [P.dissolved_oxygen]: wqReadings.dissolvedOxygen,
+          [P.temperature]: wqReadings.temperature,
+          [P.ph]: wqReadings.ph,
+          [P.ammonia]: wqReadings.ammonia,
+          [P.nitrite]: wqReadings.nitrite,
+          [P.nitrate]: wqReadings.nitrate,
+          [P.remarks]: wqReadings.remarks,
+          ...madeBy(wqReadings),
+        }),
+      )
+      .from(wqReadings)
+      .$dynamic(),
+    wqReadings.pondCode,
+  ),
+);
+
+export const feedingView = pgView("export_feeding").as((qb) =>
+  atPond(
+    qb
+      .select(
+        named({
+          ...recordFields(feedingEvents),
+          ...pondFields,
+          feed: feedingEvents.feed,
+          [P.feed_amount_kg]: feedingEvents.feedAmountKg,
+          [P.feedings_count]: feedingEvents.feedingsCount,
+          [P.remarks]: feedingEvents.remarks,
+          ...madeBy(feedingEvents),
+        }),
+      )
+      .from(feedingEvents)
+      .$dynamic(),
+    feedingEvents.pondCode,
+  ),
+);
+
+export const mortalityView = pgView("export_mortality").as((qb) =>
+  atPond(
+    qb
+      .select(
+        named({
+          ...recordFields(mortalityEvents),
+          ...pondFields,
+          [P.mortality_count]: mortalityEvents.mortalityCount,
+          cause_death: mortalityEvents.causeDeath,
+          note_death: mortalityEvents.noteDeath,
+          ...madeBy(mortalityEvents),
+        }),
+      )
+      .from(mortalityEvents)
+      .$dynamic(),
+    mortalityEvents.pondCode,
+  ),
+);
+
+// One row per Fish measurement, its Sampling event's fields repeated.
+export const samplingView = pgView("export_sampling").as((qb) =>
+  atPond(
+    qb
+      .select(
+        named({
+          ...recordFields(samplingEvents),
+          ...pondFields,
+          [P.sampling_event]: samplingEvents.id,
+          [P.notes]: samplingEvents.notes,
+          ...madeBy(samplingEvents),
+          measure_event: sql<string>`'MONITOR'`, // DMS v5: routine monitoring of ponds
+          wt: fishMeasurements.wt,
+          len_st: fishMeasurements.lenSt,
+        }),
+      )
+      .from(fishMeasurements)
+      .innerJoin(samplingEvents, eq(samplingEvents.id, fishMeasurements.samplingEventId))
+      .$dynamic(),
+    samplingEvents.pondCode,
+  ),
+);
+
+export const pondView = pgView("export_pond").as((qb) =>
+  qb
+    .select(
+      named({
+        site: pond.site,
+        name_site: site.nameSite,
+        timezone: site.timezone,
+        ...pondFields,
+        [P.display_name]: pond.displayName,
+        [P.area_code]: pond.areaCode,
+        [P.zone]: pond.zone,
+        [P.unit_type]: pond.unitType,
+        species: pond.species,
+        [P.status]: pond.status,
+        [P.legacy_location]: pond.legacyLocation,
+        [P.legacy_tank_id]: pond.legacyTankId,
+        lat_pond: pond.latPond,
+        long_pond: pond.longPond,
+        area_pond: pond.areaPond,
+        [P.volume_m3]: pond.volumeM3,
+        [P.depth_m]: pond.depthM,
+        [P.water_source]: pond.waterSource,
+        [P.commissioned_date]: sql<string | null>`to_char(${pond.commissionedDate}, 'YYYYMMDD')`,
+        note_pond: pond.notePond,
+      }),
+    )
+    .from(pond)
+    .innerJoin(site, eq(site.site, pond.site)),
+);

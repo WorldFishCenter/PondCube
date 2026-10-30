@@ -20,16 +20,16 @@ Hosted on Vercel (functions pinned to Singapore). Node 20+.
 
 ## Commands
 
-| Command                                       | Does                                                                                                                                                                    |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev` / `build` / `start`             | Next.js                                                                                                                                                                 |
-| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                                                           |
-| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                                                 |
-| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, outbox, record intake, Airtable sync, operator access, legacy import — against in-memory Postgres (PGLite, no network) |
-| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                                                |
-| `npm run db:sync`                             | Check, then copy sites + species + feeds + ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                      |
-| `npm run db:sync-ponds` / `db:sync-operators` | Same, sites + ponds (with species) or sites + operators only                                                                                                            |
-| `npm run db:import-legacy -- <csv>`           | One-off: legacy water-quality log (converted CSV) → `wq_readings`, checked, all-or-nothing; `-- --prod` as above                                                        |
+| Command                                       | Does                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev` / `build` / `start`             | Next.js                                                                                                                                                                                                                                                                              |
+| `npm run format` / `format:check`             | Prettier: rewrite / verify formatting (skips `components/ui`)                                                                                                                                                                                                                        |
+| `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                                                                                                                                                              |
+| `npm run check`                               | Self-checks: validation ranges, draft lifecycle, outbox, record intake, Airtable sync, operator access, legacy import, seeing the data, the .xlsx download — against in-memory Postgres (PGLite, no network); the .xlsx one opens files with openpyxl (python3 with openpyxl, or uv) |
+| `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                                                                                                                                                             |
+| `npm run db:sync`                             | Check, then copy sites + species + feeds + ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                                                                                                                                   |
+| `npm run db:sync-ponds` / `db:sync-operators` | Same, sites + ponds (with species) or sites + operators only                                                                                                                                                                                                                         |
+| `npm run db:import-legacy -- <csv>`           | One-off: legacy water-quality log (converted CSV) → `wq_readings`, checked, all-or-nothing; `-- --prod` as above                                                                                                                                                                     |
 
 Run `npm run check`, `npm run typecheck` and `npm run format:check` before committing.
 
@@ -40,6 +40,9 @@ app/page.tsx              Signed-in operator check per request (Suspense), then 
 app/layout.tsx            Inter font (shadcn preset), viewport, ClerkProvider (shadcn theme), ThemeProvider
 app/sign-in               Clerk's sign-in page (sign-in-or-up, no sign-up page); proxy.ts = clerkMiddleware (routes stay public)
 app/api/records/route.ts  Where the Outbox sends each Record (POST); Person = signed-in operator
+app/api/download/route.ts Water-quality download: one site + month as .xlsx (GET, signed in)
+app/api/data/[file]/route.ts   Data link CSVs (wq|feeding|mortality|sampling|ponds .csv?key=…), streamed
+app/api/data-link/route.ts     Makes the signed-in account's data link key (POST), replacing the old one
 app/globals.css           shadcn theme tokens (incl. --logo-outline) + 44px touch-target rule
 app/icon.svg              Favicon (outline follows OS theme); apple-icon.png = iOS home screen
 app/manifest.ts           Web app manifest (installable); icons in public/icon-*.png
@@ -51,14 +54,17 @@ components/pondcube-logo.tsx   Logo mark for in-app use (same artwork as app/ico
 components/install-prompt.tsx  "Install the app" link + drawer (opens itself once, on load, on a first visit in a phone
                           browser): install steps per platform; one-tap Install where the browser offers it. In app/page.tsx
 components/collection/*    App UI: shell (who/where/when panel, record kinds → tabs), not-on-list card, pond picker,
-                          the 4 forms, feedback sheet (Airtable form); record-form.tsx = shared form hook (draft, save) + fields;
+                          the 4 forms, feedback sheet (Airtable form), data sheet ("Your data": download + data link);
+                          record-form.tsx = shared form hook (draft, save) + fields;
                           outbox.tsx = sending to app/api/records + the "waiting to send" notice
-lib/schema.ts             Drizzle tables — the single source of truth for the data model
+lib/schema.ts             Drizzle tables and export views (PROVISIONAL names) — the single source of truth for the data model
+lib/export.ts             Seeing the data: readRows (the only site filter on rows people see), data link keys, CSV
+lib/workbook.ts           The water-quality .xlsx (write-excel-file, plus table + comment "features"; Penang area order)
 lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules; RECORD_KINDS; withNewNames() reads
                           Drafts and Outbox Records saved before 0.8.0
 lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing; the caller names the Person
 lib/data.ts               Server-only cached reads (operator by email, a site's ponds and feeds)
-lib/access.ts             Signed-in access: wires Clerk into lib/operators.ts (server-only)
+lib/access.ts             Signed-in access, and a data link key's access: wires Clerk into lib/operators.ts (server-only)
 lib/operators.ts          Operator access: account → signed out / not on the list / Operator (with sites); refusal() = pond not at
                           their sites or feed not used there; email normaliser (shared with sync)
 lib/storage.ts            Device storage seam (localStorage, guarded): Drafts, Outbox, remembered pond and Recorded-at
@@ -70,7 +76,8 @@ lib/version.ts            App version from package.json (server-only: footer, fe
 scripts/sync-airtable.ts  Airtable (PondCube base: sites, species, feeds, ponds, operators) → Neon, same tables
 scripts/import-legacy.ts  One-off: legacy Excel log (converted CSV) → wq_readings; its decisions are in the file header
 scripts/migrate-0.8.0.sql One-off: production from 0.7.0 to 0.8.0 (DMS v3 renames, values kept); see docs/architecture.md
-scripts/check-*.ts        The self-checks run by `npm run check` (fake-storage.ts: their storage adapters)
+scripts/migrate-0.10.0.sql One-off: each site's timezone and a changed view, before push (0.9.0 → 0.10.0)
+scripts/check-*.ts        The self-checks run by `npm run check` (fake-storage.ts: their storage adapters; xlsx-dump.py: openpyxl)
 ```
 
 ## How to work
@@ -136,6 +143,10 @@ These favour care over speed; on trivial tasks, use judgment.
 - **Server-only boundaries.** `lib/db.ts`, `lib/data.ts`, `lib/access.ts` and
   `app/api/*` are server-only. Never import them into client components or leak
   `DATABASE_URL`/`CLERK_SECRET_KEY` to the client.
+- **Rows people see are filtered by site in one place.** Every download or data link reads through
+  `readRows` (`lib/export.ts`) with the Operator's sites from `accessFor` on that request. Don't add another
+  read of Records for people, or another site filter. A changed export view needs `DROP VIEW` before
+  `db:push` (push skips changed views).
 - **Everything keys on `pond_code`.** It's the join across the pond table, every event
   table, legacy history, and (later) sensor data.
 

@@ -41,6 +41,7 @@ bad(mortalitySchema, { mortalityCount: "-1" });
 bad(mortalitySchema, { mortalityCount: "2.5" });
 ok(mortalitySchema, { mortalityCount: "1", causeDeath: "Water_quality" }); // enums come from lib/options
 bad(mortalitySchema, { mortalityCount: "1", causeDeath: "water_quality" }); // DMS codes are case-sensitive
+bad(mortalitySchema, { mortalityCount: "1", causeDeath: "Cull" }); // v3 only: v5 splits it into Cull_*
 
 const fishId = base.id; // any uuid
 ok(samplingSchema, {
@@ -74,7 +75,8 @@ assert.deepEqual(withNewNames("feeding", { feedType: "other", feedTypeOther: "Ri
 assert.deepEqual(withNewNames("sampling", { fish: [{ id: "f", weightG: 120 }] }), {
   fish: [{ id: "f", wt: 120, lenSt: undefined }],
 });
-const current = { causeDeath: "Cull", noteDeath: "x" };
+assert.equal(withNewNames("mortality", { suspectedCause: "handling" }).causeDeath, "Handling_mortality");
+const current = { causeDeath: "Cull_final", noteDeath: "x" };
 assert.equal(withNewNames("mortality", current), current, "new names are left as they are");
 // Ids: made when the form is checked at Save (device), required when saving, so a resend is stored once.
 const sampled = samplingForm.parse({ fish: [{ wt: "1" }] });

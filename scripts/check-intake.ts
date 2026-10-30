@@ -31,7 +31,7 @@ async function main() {
     return intake.save(kind, sent, "Operator 1");
   };
 
-  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung" });
+  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung", timezone: "Asia/Kuala_Lumpur" });
   await db.insert(schema.pond).values({
     pondCode: "PEN-FT1-001",
     displayName: "Fish Tank 1 - #1",
@@ -58,6 +58,7 @@ async function main() {
   const [wq] = await db.select().from(schema.wqReadings);
   assert.equal(wq.dissolvedOxygen, 6.5);
   assert.equal(wq.ph, null);
+  assert.equal(wq.remarks, null, 'a blank note is stored as null, not ""');
   assert.equal(wq.recordedAt.toISOString(), recordedAt.toISOString(), "recorded-at keeps its instant");
   assert.equal(wq.appVersion, "9.9.9", "stamped with the server's app version");
   await save("feeding", { ...who, recordedAt, feedAmountKg: "3.5", feedingsCount: "2" });

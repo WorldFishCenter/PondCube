@@ -1,17 +1,21 @@
 # Naming alignment with the WorldFish GIP data standard
 
-Draft for review with Matt Hamilton, 2026-10-29. What has already changed is under Status.
+Draft for review with Matt Hamilton, 2026-10-29; updated to DMS Version 5 on 2026-10-30. What has already changed is
+under Status.
 
 At the 2026-10-29 demo Matt asked that every genetic improvement program (GIP) site (Penang, Bangladesh, Egypt,
 Zambia) use one set of names and identifiers, including the names Operators see in the app. This document maps PondCube
 Collect's names onto that standard, lists the renames, lists what the standard records that we don't, and ends with the
-questions only Matt can answer. Renames should land before Penang go-live and before the Excel export ships: after
-that, a pond rename strands Drafts and Outbox Records on devices, and any column rename breaks people's Excel queries.
+questions only Matt can answer. Renames should land before Penang go-live: after that, a pond rename strands Drafts
+and Outbox Records on devices. Data links are already open, so a column rename breaks the Excel queries built on it;
+those get reshaped when it happens.
 
 **Sources read**
 
-- **DMS**: Hamilton MG. 2021. _WorldFish Carp Genetic Improvement Program Data Management System (Version 3): Data
-  input._ All 49 pages, including the database schema in Annex 1.
+- **DMS**: Hamilton MG. 2025. _WorldFish Genetic Improvement Program Data Management Systems (Version 5): Data
+  input._ All 55 pages, including the database schema in Annex 1. It covers carp, GIFT tilapia, Abbassa (GIANT)
+  tilapia and other tilapia species. It replaces Version 3 (Hamilton 2021, carp only, 49 pages), which this document
+  first used; what changed is under Status.
 - **Pond book**: `2025 CGIP pond book.xlsm`, the Bangladesh workbook in current use (Talbaria site, 51 sheets). Read
   cell by cell with openpyxl; macros were not run. Dropdown lists and Excel validation bounds were read from the sheet
   XML.
@@ -24,14 +28,29 @@ that, a pond rename strands Drafts and Outbox Records on devices, and any column
 
 **Answered on 2026-10-29**
 
-- Q1: where the DMS v3 and the pond book disagree, the DMS wins. From the table in 1.6, that settles: a pond is `SITE`
+- Q1: where the DMS and the pond book disagree, the DMS wins. From the table in 1.6, that settles: a pond is `SITE`
   plus `POND_NEST` (a whole number below 1000, unique within the site); species are written `CC`; causes of death are
-  the DMS's four (`Cull`, `Unknown`, `Disease_parasites`, `Water_quality`); export headers look like `CAUSE_DEATH`;
-  export dates are `YYYYMMDD` text.
+  the DMS's (eleven in v5); export headers look like `CAUSE_DEATH`; export dates are `YYYYMMDD` text.
 - Q3 (in part): Penang's `NAME_SITE` is "Batu Maung". Whether `PEN` is its `SITE` code is still open.
 - Q6: pond area is in hectares.
 
-**Changed on 2026-10-29**: the pond fields the DMS v3 names.
+**Changed on 2026-10-30: DMS Version 5.** Every name the app already uses is the same in v5 (`SITE`, `POND_NEST`,
+`NAME_SITE`, `SPECIES`, `FEED`, `PERSON`, `CAUSE_DEATH`, `NOTE_DEATH`, `WT`, `LEN_ST`, `YYYYMMDD` dates). Two things
+changed in the app (version 0.10.0):
+
+- Causes of death: v5 has eleven, and the app offers exactly those, as written: `Cull_post_harvest_measure`,
+  `Cull_post_mating`, `Cull_final`, `Cull_other`, `Disease_parasites`, `Handling_mortality`, `Measurement_mortality`,
+  `Missing`, `Tagging_mortality`, `Unknown`, `Water_quality`. v3's plain `Cull` is gone. No Record used it (testing
+  phase), so nothing was converted. A pre-0.8.0 Draft's `handling` now reads as `Handling_mortality`.
+- Sampling export: every row carries `MEASURE_EVENT` = `MONITOR`, v5's measurement event for "Routine monitoring of
+  ponds". This answers Q11's event code.
+
+v5 also adds what the app doesn't record yet: fish transfers per tagged fish (`fish_trans`, with a cohort,
+`COHORT_DESC`), the total length trait `LEN_TOT`, and `PRIMARY_TR` on traits (see 1.4, 1.5, 4 and 8). Unlike v3, it no
+longer says that pond environment and management data live in a separate system, but it still has no tables for them
+(no water chemistry, no daily feed).
+
+**Changed on 2026-10-29**: the pond fields the DMS names.
 
 | Before                  | Now                     | Standard                |
 | ----------------------- | ----------------------- | ----------------------- |
@@ -48,12 +67,12 @@ no values needed converting. The Operators' screens and the Records on devices a
 Maung") is now set on the site's row in the Airtable `sites` table (`name_site` later moved from the pond to the site,
 see Also done) and reaches Neon with the next sync.
 
-Also changed (app version 0.8.0): the causes of death an Operator can pick are now the DMS's four, stored and shown as
-the DMS writes them: `Cull`, `Unknown`, `Disease_parasites`, `Water_quality`. The app's earlier six (disease,
-predation, handling, water_quality, unknown, other) came with its first version, not from Penang, and no Record used
-them.
+Also changed (app version 0.8.0): the causes of death an Operator can pick became v3's four, stored and shown as the
+DMS writes them: `Cull`, `Unknown`, `Disease_parasites`, `Water_quality` (v5's eleven since 0.10.0, see above). The
+app's earlier six (disease, predation, handling, water_quality, unknown, other) came with its first version, not from
+Penang, and no Record used them.
 
-Also changed: the Record fields the DMS v3 names. Done in the code and the Neon dev database; production follows with
+Also changed: the Record fields the DMS names. Done in the code and the Neon dev database; production follows with
 `scripts/migrate-0.8.0.sql` when the change is deployed. These are renames only, so existing values (e.g. the Person on
 the 4,334 legacy readings) are kept. Drafts and Outbox Records saved on a device before the change are read under the
 new names. A value with no new field (an old feed type, or a cause the DMS lacks) goes in the remarks or note, on
@@ -82,7 +101,8 @@ The app shows the standard names in plain words, not capitals and underscores (e
 - Species: a `species` table (DMS `SPECIES`, `SPECIES_LATIN`; `species_common` from the pond book) in Airtable and
   Neon. Each pond links to its species; Neon stores the two-letter code. `ON` (_Oreochromis niloticus_) is ours, not in
   the DMS or the pond book: confirm the code with Matt.
-- Ranges for fish measurements follow the DMS trait list: `wt` 0–20,000 g, `len_st` 0–100 cm.
+- Ranges for fish measurements follow the DMS trait list: `wt` 0–20,000 g (v3's example; v5's example doesn't list
+  `WT`), `len_st` 0–100 cm (both versions).
 - Sites: a `sites` table (DMS `SITE` fields; one row: `PEN`, Batu Maung) in Airtable and Neon. Ponds and operators
   link to it; `name_site` moved from the pond to the site, as in the DMS. An Operator sees and records only the ponds
   of their own sites, and some have several (decided).
@@ -105,9 +125,10 @@ was done for this one.
 ## Summary
 
 - The standard has two layers. The DMS is the genetics database: individual fish, families, spawning, deaths,
-  measurements. It says pond environment and management data live in a separate system, the pond book, which records
-  water chemistry, feed, fertiliser, treatments, fish and water transfers, deaths and random samples per pond per day.
-  Our four Record kinds belong to the pond book's layer. The DMS supplies the naming grammar and identifier formats.
+  transfers, measurements. v3 said pond environment and management data live in a separate system, the pond book,
+  which records water chemistry, feed, fertiliser, treatments, fish and water transfers, deaths and random samples per
+  pond per day; v5 drops that sentence but still has no tables for them. Our four Record kinds belong to the pond
+  book's layer. The DMS supplies the naming grammar and identifier formats.
 - Most of our terms have a standard equivalent with the same meaning and a different name. The units mostly agree:
   mg/l, °C, g, cm.
 - **Pond codes are the hardest change.** We use `PEN-FT3-091` (site, area, number). The standard identifies a pond
@@ -115,12 +136,12 @@ was done for this one.
   Fish Tanks 1–3 share one run (1–210), but Hatchery, Block L, Aqua, Water Storage and Pond each restart at 1. So 86
   ponds need new numbers (Q4).
 - No Record of ours carries a **species**. In the standard, every death, transfer and sample row does.
-- Values that differ: mortality causes (now the DMS's four; the pond book has 12), Period (morning/afternoon vs
-  morning/midday/afternoon), feed (kg per feeding vs grams per feed product per day).
-- The two sources disagree with each other on a few points: pond area unit, species value, death causes, header
-  spelling. Matt needs to say which source wins (Q1).
+- Values that differ: Period (morning/afternoon vs morning/midday/afternoon), feed (kg per feeding vs grams per feed
+  product per day). Mortality causes now match the DMS's eleven.
+- The two sources disagree with each other on a few points: pond area unit, species value, one death cause, pond
+  category, header spelling. The DMS wins (Q1).
 - The standard records things we don't yet: fish transfers, water transfers, fertiliser, treatments, Secchi disc and
-  water depth, per-species random samples, pond category.
+  water depth, per-species random samples, pond category (the DMS's cohort).
 
 ## 1. The standard
 
@@ -131,7 +152,7 @@ was done for this one.
 | Field names are UPPER_SNAKE, attribute first, entity last                                  | `DATE_DEATH`, `CAUSE_DEATH`, `LAT_POND`, `AREA_POND`, `NAME_SITE`         | DMS       |
 | Free text is `NOTE_<ENTITY>`                                                               | `NOTE_POND`, `NOTE_DEATH`, `NOTE_MEASURE`                                 | DMS       |
 | `_NEST` marks an identifier that is unique only inside its parent                          | `POND_NEST` within `SITE`; `FAM_NEST` within `SPAWN_ROUND` + `SPECIES`    | DMS       |
-| A pond in a role takes the role as suffix                                                  | `SITE_GROW_OUT` + `POND_NEST_GROW_OUT`; `SITE_NURSE` + `POND_NEST_NURSE`  | DMS       |
+| A pond in a role takes the role as suffix                                                  | `SITE_GROWOUT` + `POND_NEST_GROWOUT`; `SITE_NURSE` + `POND_NEST_NURSE`    | DMS       |
 | Who did it is `PERSON` (free text, 50 chars)                                               | `KAMRUZZAMAN`, `MGH`                                                      | DMS       |
 | Dates are text `YYYYMMDD`                                                                  | `20181013`                                                                | DMS       |
 | Data-entry headers are spaced capitals with the unit on the row below; free text `REMARKS` | `DISOLVED OXYGEN MORNING (mg/l)`, `FEED 1 WEIGHT (g)`, `CAUSE OF DEATH`   | Pond book |
@@ -150,7 +171,7 @@ was done for this one.
 | Spawn round              | 7 characters: program letter + year + run number                          | `C202501`                                               |
 | Individual fish          | `INDIV` = spawn round + `_` + PIT tag, up to 22 characters                | `C201701_00076AECF5`                                    |
 | Family                   | `FAM_NEST`, integer < 10000 within spawn round + species                  | `214`                                                   |
-| Measurement event        | Short code                                                                | `TAG`, `HARV`, `POST_HARV`                              |
+| Measurement event        | Short code                                                                | `TAG`, `HARV`, `POST_HARV`, `MONITOR`                   |
 | Trait                    | Short code, up to 10 characters                                           | `WT`, `LEN_ST`, `WT_HOG`                                |
 | Feed / fertiliser codes  | 3 / 4 characters (DMS treatment level)                                    | `NAT`, `SUP`; `UNDE`                                    |
 | Country                  | ISO 3166 alpha-3                                                          | `BGD`                                                   |
@@ -182,15 +203,18 @@ In 2025 the logs hold 76 120 fish transfer rows, 18 025 fish death rows (one per
 
 ### 1.4 DMS tables that touch ours
 
-| Load file                   | Fields                                                                                                                                                                     |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `site`                      | `SITE`, `NAME_SITE` (closest town or village on Google Maps), `OWNER_SITE`, `PHONE_SITE`, `EMAIL_SITE`, `LAT_SITE`, `LONG_SITE`, `NOTE_SITE`                               |
-| `pond_desc`                 | `SITE`, `POND_NEST`, `AREA_POND` (ha), `LAT_POND`, `LONG_POND`, `NOTE_POND`                                                                                                |
-| `species`                   | `SPECIES`, `SPECIES_LATIN`                                                                                                                                                 |
-| `death`                     | `INDIV`, `SPECIES`, `DATE_DEATH`, `CAUSE_DEATH`, `NOTE_DEATH`                                                                                                              |
-| `measure_data`              | `INDIV`, `MEASURE_EVENT`, one column per trait (`WT`, `LEN_ST`, `WIDTH`, `DEPTH`, …), `PERSON`, `NOTE_MEASURE`, `DATE_MEASURE`                                             |
-| `trait`                     | `TRAIT`, `NAME_TRAIT`, `UNITS`, `MIN`, `MAX`, `TYPE`, `CATEGORY`, `BODY_PART`, `NOTE_TRAIT`. Examples: `WT` total weight, g, 0–20 000; `LEN_ST` standard length, cm, 0–100 |
-| `feed`, `fert`, `treatment` | Treatment codes for progeny tests (`CULTURE` M/P, `FEED`, `FERT`, `NEST_TREAT`), not daily applications                                                                    |
+| Load file                   | Fields                                                                                                                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `site`                      | `SITE`, `NAME_SITE` (closest town or village on Google Maps), `OWNER_SITE`, `PHONE_SITE`, `EMAIL_SITE`, `LAT_SITE`, `LONG_SITE`, `NOTE_SITE`                                                                                                      |
+| `pond_desc`                 | `SITE`, `POND_NEST`, `AREA_POND` (ha), `LAT_POND`, `LONG_POND`, `NOTE_POND`                                                                                                                                                                       |
+| `species`                   | `SPECIES`, `SPECIES_LATIN`                                                                                                                                                                                                                        |
+| `death`                     | `INDIV`, `SPECIES`, `DATE_DEATH`, `CAUSE_DEATH` (eleven values, see Status), `NOTE_DEATH`                                                                                                                                                         |
+| `fish_trans` (new in v5)    | `INDIV`, `COHORT_DESC`, `DATE_FISH_TRANS`, `SITE_FISH_TRANS`, `POND_NEST_FISH_TRANS`, `SPECIES`: one row per tagged fish moved                                                                                                                    |
+| `indiv_stock`               | `INDIV`, `DATE_FISH_TRANS`, `COHORT_DESC`, `SITE_FISH_TRANS`, `HAPA_NEST`, `POND_NEST_FISH_TRANS`, `SELECTION_TAG`: tagged fish into a grow-out pond                                                                                              |
+| `measure_data`              | `INDIV`, `MEASURE_EVENT`, one column per trait (`WT`, `LEN_ST`, `WIDTH`, `DEPTH`, …), `PERSON`, `NOTE_MEASURE`, `DATE_MEASURE`                                                                                                                    |
+| `measure_event`             | `MEASURE_EVENT`, `ALLOW_REPEAT`, `NOTE_MEASURE_EVENT`. Examples: `TAG`, `HARV`, `POST_HARV`, `MONITOR` ("Routine monitoring of ponds", repeatable)                                                                                                |
+| `trait`                     | `TRAIT`, `NAME_TRAIT`, `UNITS`, `MIN`, `MAX`, `TYPE`, `CATEGORY`, `BODY_PART`, `PRIMARY_TR` (new in v5), `NOTE_TRAIT`. Examples: `WT` total weight, g, 0–20 000 (v3); `LEN_ST` standard length, cm, 0–100; `LEN_TOT` total length, cm, 0–100 (v5) |
+| `feed`, `fert`, `treatment` | Treatment codes for progeny tests (`CULTURE` M/P, `FEED`, `FERT`, `NEST_TREAT`), not daily applications                                                                                                                                           |
 
 The rest of the DMS (spawning, tagging, families, hapas, founders, EBVs, tissue samples, dissemination) is genetics work
 outside PondCube Collect.
@@ -203,26 +227,29 @@ outside PondCube Collect.
   `CC (catla)`.
 - **Cause of death**: `Cull_post_harvest_measure`, `Cull_post_mating`, `Cull_final`, `Cull_backup`, `Cull_other`,
   `Handling_mortality`, `Tagging_mortality`, `Measurement_mortality`, `Unknown`, `Disease_parasites`, `Water_quality`,
-  `Missing` (not found when the pond was drained or netted, assumed dead).
+  `Missing` (not found when the pond was drained or netted, assumed dead). The DMS v5 has the same list without
+  `Cull_backup`.
 - **Pond category**: `NURSERY`, `GROW_OUT`, `BROOD`, `PARENTS`, `BACKUP`, `OTHER`, `PREGROWOUT`. It describes what a
-  pond is used for and is recorded on each transfer, not on the pond.
+  pond is used for and is recorded on each transfer, not on the pond. The DMS v5 records a cohort on each transfer
+  instead, `COHORT_DESC`: `PREGROWOUT`, `GROWOUT`, `TRIAL`, `BACKUP`, `BROOD`, `PARENTS`, `OTHER`.
 - **Feed type**: product names with composition (protein, carbohydrate, fat, ash, moisture %): Mega Nursery Powder,
   Mega Pre Starter, Mega Carp Grower, Nutri-egg, Tiger nursery feed.
 - **Fertiliser type**: Urea, TSP, MOC, Yeast, Molasses, Rice_Polish.
 - **Treatment type**: Lime, Timsen, Acimec, Salt, TSC (tea seed cake), Paratics.
 - **Period**: MORNING, MIDDAY, AFTERNOON (column groups, each with its own time).
-- **Measurement event** (DMS): `TAG`, `HARV`, `POST_HARV`.
+- **Measurement event** (DMS): `TAG`, `HARV`, `POST_HARV`, and in v5 `MONITOR`.
 
 ### 1.6 Where the two sources disagree
 
-| Topic           | DMS v3                                                                        | Pond book                                                |
-| --------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------- |
-| Pond identifier | Two fields, `SITE` + `POND_NEST`                                              | One value, `TAL_01`                                      |
-| Pond area unit  | Hectares (but the example values, 35, 36, 42, look like decimals)             | Decimals                                                 |
-| Species value   | `CC`                                                                          | `CC (catla)`                                             |
-| Causes of death | 4: `Cull`, `Unknown`, `Disease_parasites`, `Water_quality`; 22 characters max | 12 (above); `Cull_post_harvest_measure` is 25 characters |
-| Header style    | `CAUSE_DEATH`, `DATE_DEATH`                                                   | `CAUSE OF DEATH`, `DATE`, `COUNT_DEAD`                   |
-| Date            | Text `YYYYMMDD`                                                               | Excel date                                               |
+| Topic             | DMS v5                                                                                 | Pond book                                                         |
+| ----------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Pond identifier   | Two fields, `SITE` + `POND_NEST`                                                       | One value, `TAL_01`                                               |
+| Pond area unit    | Hectares (but the example values, 35, 36, 42, look like decimals)                      | Decimals                                                          |
+| Species value     | `CC`                                                                                   | `CC (catla)`                                                      |
+| Causes of death   | 11: the pond book's list without `Cull_backup` (v3 had 4: `Cull`, `Unknown`, …)        | 12 (above)                                                        |
+| Transfer category | `COHORT_DESC`: `PREGROWOUT`, `GROWOUT`, `TRIAL`, `BACKUP`, `BROOD`, `PARENTS`, `OTHER` | `TO POND CATEGORY`: adds `NURSERY`, spells `GROW_OUT`, no `TRIAL` |
+| Header style      | `CAUSE_DEATH`, `DATE_DEATH`                                                            | `CAUSE OF DEATH`, `DATE`, `COUNT_DEAD`                            |
+| Date              | Text `YYYYMMDD`                                                                        | Excel date                                                        |
 
 ## 2. Mapping: ours → standard
 
@@ -244,13 +271,13 @@ Match: **same** (name and meaning agree), **rename** (same meaning, different na
 | Period                        | MORNING / MIDDAY / AFTERNOON                       | recode | Q8                                                           |
 | Feeding event                 | Feed                                               | rename | Different shape, 2.5                                         |
 | Mortality record              | Fish death (summary row)                           | rename |                                                              |
-| Sampling event                | Random sample (pond book); measurement event (DMS) | rename | Q11                                                          |
+| Sampling event                | Random sample (pond book); measurement event (DMS) | rename | Exported as `MEASURE_EVENT` `MONITOR` (v5); Q11              |
 | Fish measurement              | Trait values `WT`, `LEN_ST`                        | rename |                                                              |
 | Recorded-at                   | `DATE` (+ `TIME` for water chemistry)              | rename | We keep the exact instant; the standard keeps a date. Q13    |
 | Range                         | Trait `MIN` / `MAX`; workbook validation bounds    | same   | 2.8                                                          |
 | Draft, Outbox, Record intake  | —                                                  | none   | App concepts                                                 |
 | Site, Species                 | `SITE`, `SPECIES`                                  | done   | Added to our glossary                                        |
-| —                             | Spawn round, PIT, Pond category                    | —      | Missing from our glossary                                    |
+| —                             | Spawn round, PIT, cohort (pond category)           | —      | Missing from our glossary                                    |
 
 ### 2.2 Ponds (`pond` table, Airtable `ponds`)
 
@@ -321,8 +348,8 @@ rows (`PIT`, DMS `INDIV`) need tagged fish.
 | —                                     | `SPECIES`     | none   | Q7                     |
 | `note_death` (was `remarks`)          | `NOTE_DEATH`  | done   |                        |
 
-Causes: done on 2026-10-29. The app offers exactly the DMS's four (`Cull`, `Unknown`, `Disease_parasites`,
-`Water_quality`), per Q1. The pond book's longer list (five `Cull_*`, three `*_mortality`, `Missing`) is not offered.
+Causes: done on 2026-10-29, moved to v5 on 2026-10-30. The app offers exactly the DMS v5's eleven (see Status), per
+Q1. The pond book's `Cull_backup`, not in v5, is not offered.
 
 ### 2.7 Sampling event + Fish measurement → random sample / measurement
 
@@ -331,7 +358,7 @@ keeps individual values per tagged fish.
 
 | Ours                                         | Standard                                         | Match  | Note                                                    |
 | -------------------------------------------- | ------------------------------------------------ | ------ | ------------------------------------------------------- |
-| `sampling_events` (header)                   | Random sample (pond book); `MEASURE_EVENT` (DMS) | rename | No event code for routine growth sampling, Q11          |
+| `sampling_events` (header)                   | Random sample (pond book); `MEASURE_EVENT` (DMS) | done   | Exported with `MEASURE_EVENT` `MONITOR` (v5)            |
 | `notes`                                      | `REMARKS` / `NOTE_MEASURE`                       | rename |                                                         |
 | `fish_measurements.wt` (was `weight_g`)      | `WT` total weight (g)                            | done   | Same unit                                               |
 | `fish_measurements.len_st` (was `length_cm`) | `LEN_ST` standard length (cm)                    | done   | Decided 2026-10-29                                      |
@@ -340,17 +367,17 @@ keeps individual values per tagged fish.
 
 ### 2.8 Ranges
 
-| Measurement      | Ours (`RANGES` and form schemas) | Pond book bounds               | DMS trait         |
-| ---------------- | -------------------------------- | ------------------------------ | ----------------- |
-| Dissolved oxygen | 0–20 mg/l                        | 0–50                           | —                 |
-| Temperature      | 0–45 °C                          | 0–50                           | —                 |
-| pH               | 0–14                             | 0–14                           | —                 |
-| Ammonia          | 0–100 mg/l                       | 0–50                           | —                 |
-| Nitrite, nitrate | 0–100, 0–500 mg/l                | —                              | —                 |
-| Feed             | 0–100 000 kg per feeding         | 0–15 000 g per product per day | —                 |
-| Fish weight      | over 0, up to 20 000 g           | mean 0–15 000 g                | `WT` 0–20 000 g   |
-| Fish length      | over 0, up to 100 cm (standard)  | —                              | `LEN_ST` 0–100 cm |
-| Dead fish count  | 0–1 000 000                      | —                              | —                 |
+| Measurement      | Ours (`RANGES` and form schemas) | Pond book bounds               | DMS trait            |
+| ---------------- | -------------------------------- | ------------------------------ | -------------------- |
+| Dissolved oxygen | 0–20 mg/l                        | 0–50                           | —                    |
+| Temperature      | 0–45 °C                          | 0–50                           | —                    |
+| pH               | 0–14                             | 0–14                           | —                    |
+| Ammonia          | 0–100 mg/l                       | 0–50                           | —                    |
+| Nitrite, nitrate | 0–100, 0–500 mg/l                | —                              | —                    |
+| Feed             | 0–100 000 kg per feeding         | 0–15 000 g per product per day | —                    |
+| Fish weight      | over 0, up to 20 000 g           | mean 0–15 000 g                | `WT` 0–20 000 g (v3) |
+| Fish length      | over 0, up to 100 cm (standard)  | —                              | `LEN_ST` 0–100 cm    |
+| Dead fish count  | 0–1 000 000                      | —                              | —                    |
 
 The bounds differ but nothing conflicts by name. Q8 asks whether program-wide Ranges exist.
 
@@ -391,30 +418,30 @@ Each item names the question it waits on.
    rather than `feed`.
 6. **Fish death** (Q10): `cause_death`, its values and `note_death` done (see Status). Open: table
    `mortality_events` → `fish_death`; `mortality_count` → `count_dead`; add `species`.
-7. **Sampling** (Q11): `wt` and `len_st` done (see Status). Open: add `species`.
+7. **Sampling** (Q11): `wt`, `len_st` and the `MONITOR` event done (see Status). Open: add `species`.
 8. **Labels Operators see** (Q2): the pond book words in sentence case, e.g. "Water chemistry", "Cause of death",
    "Feed weight (g)", "Remarks", "Pond"; and the pond code in the picker.
-9. **Glossary**: rename the terms above (Site and Species added); add Spawn round, PIT, Pond category; add Fish
+9. **Glossary**: rename the terms above (Site and Species added); add Spawn round, PIT, cohort; add Fish
    transfer, Water transfer, Fertiliser, Treatment, Secchi disc when they are built.
 
 ## 4. What the standard has that we don't record yet
 
-| What                      | Standard fields                                                                                            | Note for Penang                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Species on fish records   | `SPECIES` (2-letter code)                                                                                  | Needed for deaths, samples and transfers         |
-| Fish transfers            | Date, species, from pond, to pond, to-pond category, count (or PIT per fish)                               | Also stocking at year start and from the nursery |
-| Water transfers           | Date, from pond, to pond, pump time (hours)                                                                | `BORE` as source                                 |
-| Fertiliser                | Type (list), weight (g), up to 3 per day                                                                   |                                                  |
-| Treatments                | Type (list), weight (g), up to 3 per day                                                                   | Lime, salt, antiparasitics                       |
-| Secchi disc, water depth  | Time, Secchi disc (cm), water depth (cm)                                                                   |                                                  |
-| Midday water chemistry    | Third period with its own time                                                                             |                                                  |
-| Random sample per species | Count and mean weight per species                                                                          | Derivable from our fish measurements             |
-| Feeding regimes           | Per pond: feed rate (% of body weight / day), frequency; fertiliser and treatment rate (g / decimal / day) | Drives "next application" in the pond book       |
-| Pond category             | `NURSERY`, `GROW_OUT`, `BROOD`, …                                                                          | On each transfer                                 |
-| Feed composition          | Protein, carbohydrate, fat, ash, moisture (%)                                                              | On the feed list                                 |
-| Pond area and position    | `AREA_POND`, `LAT_POND`, `LONG_POND`                                                                       | We have the columns; all empty                   |
-| Site details              | Owner, phone, email, position, notes                                                                       | One row for Penang                               |
-| Tagged fish               | `PIT`, `INDIV`, spawn round, family                                                                        | Only if Penang works with tagged fish            |
+| What                      | Standard fields                                                                                                   | Note for Penang                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Species on fish records   | `SPECIES` (2-letter code)                                                                                         | Needed for deaths, samples and transfers         |
+| Fish transfers            | Date, species, from pond, to pond, to-pond category, count (or PIT per fish); DMS v5 `fish_trans` per tagged fish | Also stocking at year start and from the nursery |
+| Water transfers           | Date, from pond, to pond, pump time (hours)                                                                       | `BORE` as source                                 |
+| Fertiliser                | Type (list), weight (g), up to 3 per day                                                                          |                                                  |
+| Treatments                | Type (list), weight (g), up to 3 per day                                                                          | Lime, salt, antiparasitics                       |
+| Secchi disc, water depth  | Time, Secchi disc (cm), water depth (cm)                                                                          |                                                  |
+| Midday water chemistry    | Third period with its own time                                                                                    |                                                  |
+| Random sample per species | Count and mean weight per species                                                                                 | Derivable from our fish measurements             |
+| Feeding regimes           | Per pond: feed rate (% of body weight / day), frequency; fertiliser and treatment rate (g / decimal / day)        | Drives "next application" in the pond book       |
+| Cohort (pond category)    | DMS `COHORT_DESC`: `PREGROWOUT`, `GROWOUT`, `BROOD`, …                                                            | On each transfer; the DMS list wins (1.6)        |
+| Feed composition          | Protein, carbohydrate, fat, ash, moisture (%)                                                                     | On the feed list                                 |
+| Pond area and position    | `AREA_POND`, `LAT_POND`, `LONG_POND`                                                                              | We have the columns; all empty                   |
+| Site details              | Owner, phone, email, position, notes                                                                              | One row for Penang                               |
+| Tagged fish               | `PIT`, `INDIV`, spawn round, family                                                                               | Only if Penang works with tagged fish            |
 
 ## 5. What we record that the standard doesn't
 
@@ -428,8 +455,9 @@ Each question has our proposal so a yes is enough.
 
 **Which source**
 
-1. Where the DMS v3 and the 2025 pond book disagree (1.6), which one is the standard? Is there a DMS version newer than
-   v3, or a written pond book field list newer than the 2020 guide? **Answered: the DMS wins** (see Status).
+1. Where the DMS and the 2025 pond book disagree (1.6), which one is the standard? Is there a DMS version newer than
+   v3, or a written pond book field list newer than the 2020 guide? **Answered: the DMS wins** (see Status), and the
+   current DMS is Version 5 (2025).
 
 **Names**
 
@@ -468,13 +496,13 @@ Each question has our proposal so a yes is enough.
 **Deaths**
 
 10. Are count-only rows (no PIT) acceptable as the standard record for untagged fish? (The cause list is settled: the
-    app now offers the DMS's four.)
+    app now offers the DMS v5's eleven.)
 
 **Sampling**
 
 11. Keep individual weights and lengths (and derive count and mean weight per species), or record only count and mean
-    weight? Is there a `MEASURE_EVENT` code for routine growth sampling? (Length is decided: standard length,
-    `len_st`.)
+    weight? (Length is decided: standard length, `len_st`. The event code is answered by v5: `MONITOR`, routine
+    monitoring of ponds.)
 
 **People and notes**
 
@@ -495,8 +523,8 @@ Each question has our proposal so a yes is enough.
 
 - Done: one `site` table that ponds and operators point to, and Operators limited to their own sites' ponds.
 - Pond codes start with the site code, in our format and in the standard's, so they stay unique across sites.
-- Still to do when the export is built: the site's time zone, which the export needs to turn our exact instants into
-  the DMS's local dates (`YYYYMMDD`). The DMS has no field for it.
+- Done: each site's time zone (`timezone`, an IANA name, in the Airtable `sites` table), which the exports use to
+  turn our exact instants into the DMS's local dates (`YYYYMMDD`). The DMS has no field for it.
 - Done: each site's own feed list, edited in Airtable.
 
 ## 8. Tagged fish (later, for Bangladesh)
@@ -508,7 +536,10 @@ there or the Records already stored:
   at most 22 characters. It needs a spawn round list (DMS `SPAWN_ROUND`, `NOTE_SPAWN_ROUND`), linked like species.
 - Deaths: a Mortality record keeps its count. For tagged fish it also lists each fish's `INDIV`; each becomes one DMS
   death row (`INDIV`, `SPECIES`, `DATE_DEATH`, `CAUSE_DEATH`, `NOTE_DEATH`) with the record's date, cause and note.
-- Sampling: each Fish measurement may carry an `INDIV`; its values stay `wt` and `len_st` (DMS traits).
+- Sampling: each Fish measurement may carry an `INDIV`; its values stay `wt` and `len_st` (DMS traits), under the
+  `MONITOR` event, which may repeat on the same fish.
+- Transfers, when built: one DMS v5 `fish_trans` row per tagged fish (`INDIV`, `COHORT_DESC`, `DATE_FISH_TRANS`,
+  `SITE_FISH_TRANS`, `POND_NEST_FISH_TRANS`, `SPECIES`); stocking into a grow-out pond is `indiv_stock`.
 - Species per Record: Bangladesh ponds hold several species (polyculture), so deaths and samples need their own
   `SPECIES`, as in the pond book; today the species is on the pond.
 - To settle before building: where the app gets the list of tagged fish (the DMS, the pond book's per-PIT transfers),
@@ -522,6 +553,10 @@ For Matt, in case they are worth fixing:
   WEIGHT" after "SPECIES 7"; midday pH is checked against 0–50 instead of 0–14; `PONDS` lists TAL_38 twice; HAI_00's
   latitude has a trailing comma; TAL_01's first random sample uses common names ("Catla", "Grass carp") rather than
   list values.
-- DMS v3: `DATE_DEATH` is defined as "date of spawn release/dissemination"; Table 27 is captioned 'trait' but shows
-  `pond_treat`; in Table 3 `spawn_round` repeats `sample`'s description; `CAUSE_DEATH` is 22 characters, shorter than
-  `Cull_post_harvest_measure`; the `sample` example has `SITE_SAMPLE` and `NOTE_SAMPLE`, which Table 29 doesn't list.
+- DMS v5 (still there): `CAUSE_DEATH` is `VARCHAR(22)`, shorter than its own `Cull_post_harvest_measure` (25
+  characters); the `pond_desc` example areas (35, 36, 42) look like decimals, not hectares; `ALLOW_REPEAT` is a
+  boolean (`TRUE`/`FALSE`) but its definition says a `TAG` event "would be 0"; `indiv_stock` allows five `COHORT_DESC`
+  values, `fish_trans` seven (adds `BROOD`, `PARENTS`).
+- DMS v3 (fixed in v5): `DATE_DEATH` was defined as "date of spawn release/dissemination"; a table captioned 'trait'
+  showed `pond_treat`; in Table 3 `spawn_round` repeated `sample`'s description; the `sample` example had `SITE_SAMPLE`
+  and `NOTE_SAMPLE`, which its table didn't list.

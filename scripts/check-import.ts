@@ -34,7 +34,7 @@ async function main() {
     zone: legacyLocation,
     unitType: "tank",
   });
-  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung" });
+  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung", timezone: "Asia/Kuala_Lumpur" });
   await db
     .insert(schema.pond)
     .values([

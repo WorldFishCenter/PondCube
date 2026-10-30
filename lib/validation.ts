@@ -16,8 +16,8 @@ export const RANGES = {
   ammonia: [0, 100],
   nitrite: [0, 100],
   nitrate: [0, 500],
-  wt: [0, 20000], // DMS v3 trait WT, g
-  lenSt: [0, 100], // DMS v3 trait LEN_ST, cm
+  wt: [0, 20000], // DMS trait WT, g (Range from the v3 trait table)
+  lenSt: [0, 100], // DMS v5 trait LEN_ST, cm
 } as const;
 
 // Optional decimal. int: counts map to integer DB columns, so reject decimals here rather than at insert.
@@ -28,6 +28,12 @@ const optNum = (min?: number, max?: number, int = false) => {
   if (max !== undefined) s = s.max(max, `Must be ≤ ${max}`);
   return z.preprocess(toNumber, s.optional());
 };
+
+// A blank note is no note: stored as null, never "".
+const note = z
+  .string()
+  .optional()
+  .transform((v) => (v?.trim() ? v : undefined));
 
 const reqNum = (min: number, max: number, label: string, int = false) => {
   let s = z.number({
@@ -77,7 +83,7 @@ export const waterQualityForm = z.object({
   ammonia: optNum(...RANGES.ammonia),
   nitrite: optNum(...RANGES.nitrite),
   nitrate: optNum(...RANGES.nitrate),
-  remarks: z.string().optional(),
+  remarks: note,
 });
 export const waterQualitySchema = waterQualityForm.extend(forSave);
 
@@ -86,7 +92,7 @@ export const feedingForm = z.object({
   feed: z.string().optional(), // a feed of the pond's site: refusal() in lib/operators.ts checks that
   feedAmountKg: reqNum(0, 100000, "Amount fed (kg)"),
   feedingsCount: optNum(0, 100, true),
-  remarks: z.string().optional(),
+  remarks: note,
 });
 export const feedingSchema = feedingForm.extend(forSave);
 
@@ -94,7 +100,7 @@ export const mortalityForm = z.object({
   id: madeAtSave(),
   mortalityCount: reqNum(0, 1000000, "Number of dead fish", true),
   causeDeath: enumOf(CAUSES).optional(),
-  noteDeath: z.string().optional(),
+  noteDeath: note,
 });
 export const mortalitySchema = mortalityForm.extend(forSave);
 
@@ -110,7 +116,7 @@ const fishMeasurements = <Id extends z.ZodType<string>>(id: Id) =>
 
 export const samplingForm = z.object({
   id: madeAtSave(),
-  notes: z.string().optional(),
+  notes: note,
   fish: fishMeasurements(madeAtSave()),
 });
 export const samplingSchema = samplingForm.extend({ ...forSave, fish: fishMeasurements(z.uuid()) });
@@ -124,10 +130,11 @@ export const RECORD_KINDS = {
 } as const;
 export type RecordKind = keyof typeof RECORD_KINDS;
 
-// Drafts and Outbox Records saved before 0.8.0 carry the fields' earlier names: read them under the DMS v3 ones.
+// Drafts and Outbox Records saved before 0.8.0 carry the fields' earlier names: read them under the DMS v5 ones.
 // A value with no new field (an old feed type, an old cause the DMS lacks) goes in the note, as in the database.
 const OLD_CAUSES: Record<string, string> = {
   disease: "Disease_parasites",
+  handling: "Handling_mortality",
   water_quality: "Water_quality",
   unknown: "Unknown",
 };

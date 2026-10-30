@@ -38,7 +38,8 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
-  if (request.mode === "navigate")
+  // Downloads (/api/) aren't pages: never kept, so no signal never hands over an old file.
+  if (request.mode === "navigate" && !url.pathname.startsWith("/api/"))
     event.respondWith(
       page(event, request, url.pathname).catch(async () => (await caches.match(url.pathname)) ?? Response.error()),
     );
