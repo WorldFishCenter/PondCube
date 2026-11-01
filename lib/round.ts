@@ -31,7 +31,7 @@ export function liveRound(now: Date, storage: KeyValueStorage = browserStorage) 
 export const readMarks = (round: string, storage: KeyValueStorage = browserStorage) =>
   read<Marks>(PREFIX + round, storage) ?? {};
 
-/** The marks with this one added. `liveAt`: when a reading was taken now; null for Past readings. */
+/** The marks with this one added. `liveAt`: when a reading was taken now; null for ones typed from paper. */
 export function keepMark(
   round: string,
   marks: Marks,
@@ -88,7 +88,7 @@ export function areasOf<P extends { site: string; area: string }>(ponds: P[]) {
   return [...areas.values()].sort((a, b) => a.site.localeCompare(b.site) || byArea(a.area, b.area));
 }
 
-/** Next's way through a list: the first Pond after `code` with no reading yet, "" at the end. */
+/** The way through a list: the first Pond after `code` with no reading yet, "" at the end. */
 export const pondAfter = (pondCodes: string[], marks: Marks, code?: string) =>
   pondCodes.slice(pondCodes.indexOf(code ?? "") + 1).find((c) => !marks[c]) ?? "";
 /** Where a Round picks up again: after the last Pond with a reading, not at an empty one skipped before it. */

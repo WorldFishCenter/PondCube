@@ -94,12 +94,14 @@ const WHY_NOT_SENT: Record<Stopped, string> = {
   notOnList: "Your account isn't on the operator list any more, so they can't be sent. Ask your supervisor.",
 };
 
-/** In the top panel while anything waits: whose Records, why they're not sent yet, and Send now. */
+// Going through normally: nothing to say, and appearing for each Record would shift the screen under the Operator.
+export const noticeShown = ({ mine, others, sending, stopped }: Outbox) =>
+  (mine.length > 0 || others.length > 0) && !(sending && !stopped && !others.length && !mine.some((w) => w.problem));
+
+/** While anything waits: whose Records, why they're not sent yet, and Send now. */
 export function OutboxAlert({ outbox, className }: { outbox: Outbox; className?: string }) {
   const { mine, others, sending, stopped, flush } = outbox;
-  if (!mine.length && !others.length) return null;
-  // Going through normally: nothing to say, and appearing for each Record would shift the screen under the Operator.
-  if (sending && !stopped && !others.length && !mine.some((w) => w.problem)) return null;
+  if (!noticeShown(outbox)) return null;
 
   return (
     // Wider action slot than the stock pr-18, so "Send now" fits at the 44px touch size.

@@ -390,11 +390,11 @@ The bounds differ but nothing conflicts by name. Q8 asks whether program-wide Ra
 | Tab         | Water quality                                     | WATER CHEMISTRY                                  |
 | Readings    | Dissolved oxygen, Temperature, pH, Ammonia (mg/L) | DISOLVED OXYGEN, TEMPERATURE, pH, AMMONIA (mg/l) |
 | Tab         | Feeding                                           | FEED                                             |
-| Feed        | Feed; Amount fed (kg); Feedings                   | FEED TYPE; FEED WEIGHT (g)                       |
+| Feed        | Feed; Amount fed (kg); Number of feedings         | FEED TYPE; FEED WEIGHT (g)                       |
 | Tab         | Mortality                                         | FISH DEATH                                       |
-| Deaths      | Number of dead fish; Cause of death; Note         | COUNT_DEAD; CAUSE OF DEATH; REMARKS              |
+| Deaths      | Number of dead fish; Cause of death; Remarks      | COUNT_DEAD; CAUSE OF DEATH; REMARKS              |
 | Tab         | Sampling                                          | RANDOM SAMPLE                                    |
-| Sample      | Notes; Total weight (g); Standard length (cm)     | REMARKS; MEAN WEIGHT (g); (DMS: standard length) |
+| Sample      | Remarks; Total weight (g); Standard length (cm)   | REMARKS; MEAN WEIGHT (g); (DMS: standard length) |
 | Free text   | Remarks                                           | REMARKS                                          |
 
 ## 3. Renames needed

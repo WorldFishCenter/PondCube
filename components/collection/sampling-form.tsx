@@ -37,7 +37,7 @@ export function SamplingForm(props: RecordFormProps) {
       saveLabel="Save sampling"
       {...card}
     >
-      <NotesField id="sa-n" label="Notes" placeholder="Purpose, batch, etc." {...register("notes")} />
+      <NotesField id="sa-n" placeholder="Purpose, batch, etc." {...register("notes")} />
       <FieldSet>
         <FieldLegend>Fish measurements</FieldLegend>
         <FieldDescription>{fields.length} fish · fill weight, length or both.</FieldDescription>

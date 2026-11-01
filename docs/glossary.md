@@ -70,7 +70,7 @@ _Avoid_: WQ entry, measurement
 
 **Round**
 An Operator's walk through an Area's Ponds in one Period, taking a Water-quality reading at each. Each filled row is its
-own Record, saved on Next; a Pond left empty makes none. The Round itself isn't stored: its progress is kept on the
+own Record, saved by tapping Save; on a Pond left empty that button says Skip, and makes none. The Round itself isn't stored: its progress is kept on the
 device, only to show how far the Operator got.
 _Avoid_: session, batch, shift
 
@@ -109,7 +109,7 @@ _Avoid_: edit, amendment, overwrite
 
 **Recorded-at**
 The instant the observation was made (not when it was saved), in the Operator's local time. In a Round it's the moment
-of tapping Next, or with Typing from paper on, one date and time set for the readings being typed in; a Correction keeps
+of tapping Save, or with Typing from paper on, one date and time set for the readings being typed in; a Correction keeps
 the one it corrects. For the other Record
 kinds it's set in the top panel for each Record: it starts empty and clears after every save, so no Record inherits an
 earlier one's time. Never later than now.

@@ -5,10 +5,11 @@ import { useForm, type DefaultValues, type FieldValues } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { format, parse } from "date-fns";
-import { AlertCircle, CheckCircle2, ChevronDownIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDownIcon, CloudUpload, Pencil, type LucideIcon } from "lucide-react";
 import { createDraft, type Submitted } from "@/lib/draft";
 import type { RECORD_KINDS, RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +21,39 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import type { Outbox } from "./outbox";
 
-type Result = { ok: boolean; title: string; msg: string } | null;
+type Result = { ok: boolean; title: string; msg: string; Icon: LucideIcon } | null;
 type Message = { message?: string } | undefined;
+
+// The selected tab is filled with the primary colour. Stock Tabs has no filled variant,
+// so this is shadcn's className step with semantic tokens; the dark: ones beat the stock dark style.
+export const FILLED_TAB =
+  "data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:border-transparent dark:data-active:bg-primary dark:data-active:text-primary-foreground";
+
+// Where a Record is: one word, icon and colour each, wherever it's shown.
+export const STATUS = {
+  typed: { Icon: Pencil, word: "Not saved", variant: "destructive" },
+  waiting: { Icon: CloudUpload, word: "Waiting", variant: "secondary" },
+  saved: { Icon: CheckCircle2, word: "Saved", variant: "default" },
+} as const;
+export type Status = keyof typeof STATUS;
+
+export function StatusBadge({
+  status,
+  className,
+  children = STATUS[status].word,
+}: {
+  status: Status;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const { Icon, variant } = STATUS[status];
+  return (
+    <Badge variant={variant} className={className}>
+      <Icon data-icon="inline-start" />
+      {children}
+    </Badge>
+  );
+}
 
 /** Recorded-at: local "YYYY-MM-DDTHH:mm", "" until set. `clear` runs after a save, where each Record sets its own. */
 export type RecordedAt = { value: string; clear?: () => void };
@@ -95,16 +127,17 @@ export function useRecordForm<K extends RecordKind, TValues extends FieldValues,
 // The form's message follows the Record until the server has it.
 function resultOf(submitted: Submission, { isWaiting, sending }: Outbox): Result {
   if (!submitted) return null;
-  if (typeof submitted === "string") return { ok: false, title: "Not saved", msg: NOT_SAVED[submitted] };
-  if (!isWaiting(submitted.id)) return { ok: true, title: "Saved", msg: submitted.msg };
+  if (typeof submitted === "string")
+    return { ok: false, title: "Not saved", msg: NOT_SAVED[submitted], Icon: AlertCircle };
+  if (!isWaiting(submitted.id)) return { ok: true, title: "Saved", msg: submitted.msg, Icon: STATUS.saved.Icon };
   const next = sending ? "Sending…" : "It will be sent when there's signal.";
-  return { ok: true, title: "Saved on this device", msg: `${submitted.msg} ${next}` };
+  return { ok: true, title: "Saved on this device", msg: `${submitted.msg} ${next}`, Icon: STATUS.waiting.Icon };
 }
 
 export function ResultAlert({ result }: { result: NonNullable<Result> }) {
   return (
     <Alert variant={result.ok ? "default" : "destructive"}>
-      {result.ok ? <CheckCircle2 /> : <AlertCircle />}
+      <result.Icon />
       <AlertTitle>{result.title}</AlertTitle>
       <AlertDescription>{result.msg}</AlertDescription>
     </Alert>
@@ -187,7 +220,7 @@ export function RecordedAtField({
               />
             }
           >
-            {date ? format(date, "PPP") : "Select date"}
+            {date ? format(date, "PPP") : "Select a date"}
             <ChevronDownIcon data-icon="inline-end" />
           </PopoverTrigger>
           <PopoverContent className="w-auto overflow-hidden p-0" align="start">
@@ -244,15 +277,12 @@ export function NumberField({
   );
 }
 
-export function NotesField({
-  id,
-  label = "Remarks",
-  ...textarea
-}: React.ComponentProps<"textarea"> & { id: string; label?: string }) {
+export function NotesField({ id, ...textarea }: React.ComponentProps<"textarea"> & { id: string }) {
   return (
     <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>Remarks</FieldLabel>
       <Textarea id={id} {...textarea} />
+      <FieldDescription>Optional.</FieldDescription>
     </Field>
   );
 }

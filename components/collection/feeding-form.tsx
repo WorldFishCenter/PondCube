@@ -28,7 +28,7 @@ export function FeedingForm({ feeds, ...props }: RecordFormProps & { feeds: Feed
     <RecordCard
       id="feeding-form"
       title="Feeding"
-      description="Amount fed is required."
+      description="Record the feed given to the pond."
       saveLabel="Save feeding"
       {...card}
     >
@@ -47,11 +47,11 @@ export function FeedingForm({ feeds, ...props }: RecordFormProps & { feeds: Feed
         )}
       />
       <FieldGroup className="grid grid-cols-2 gap-4">
-        <NumberField id="fd-a" label="Amount fed" hint="kg" error={errors.feedAmountKg} {...register("feedAmountKg")} />
+        <NumberField id="fd-a" label="Amount fed (kg)" error={errors.feedAmountKg} {...register("feedAmountKg")} />
         <NumberField
           id="fd-n"
-          label="Feedings"
-          hint="times, optional"
+          label="Number of feedings"
+          hint="Optional."
           integer
           error={errors.feedingsCount}
           {...register("feedingsCount")}

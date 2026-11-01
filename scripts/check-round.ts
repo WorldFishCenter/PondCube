@@ -144,7 +144,7 @@ async function main() {
   assert.equal(pondNumber("TAL_01"), 1);
   assert.equal(pondNumber("PEN-X"), "PEN-X");
 
-  // Next walks on through the ponds without a reading, so a correction goes back to where the Operator had got to.
+  // Save walks on through the ponds without a reading, so a correction goes back to where the Operator had got to.
   const walk = ["A", "B", "C", "D", "E"];
   const m = (...codes: string[]) => Object.fromEntries(codes.map((c) => [c, mark(c)]));
   assert.equal(pondAfter(walk, {}, "A"), "B");

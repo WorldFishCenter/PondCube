@@ -1,10 +1,10 @@
 import { Suspense } from "react";
-import { SignIn } from "@clerk/nextjs";
 import { signedInAccess } from "@/lib/access";
 import { getFeeds, getPonds } from "@/lib/data";
 import { CollectionApp, CollectionSkeleton, Shell } from "@/components/collection/collection-app";
 import { NotOnListCard } from "@/components/collection/not-on-list-card";
 import { InstallPrompt } from "@/components/install-prompt";
+import { SignInCard } from "@/components/sign-in-card";
 import { APP_VERSION } from "@/lib/version";
 
 // The access check reads the session, so it runs per request inside Suspense; the data reads are
@@ -15,11 +15,7 @@ async function App() {
     return (
       <Shell>
         {/* Hash routing keeps every sign-in step on this page. */}
-        <SignIn
-          routing="hash"
-          withSignUp
-          appearance={{ elements: { rootBox: "w-full", cardBox: "w-full max-w-none" } }}
-        />
+        <SignInCard routing="hash" />
       </Shell>
     );
   if (access === "notOnList")

@@ -6,7 +6,9 @@ import { waitingRecords } from "@/lib/outbox";
 import { readLocal, writeLocal } from "@/lib/storage";
 import { records } from "@/components/collection/outbox";
 import { PondCubeLogo } from "@/components/pondcube-logo";
+import { Steps } from "@/components/steps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -114,7 +116,7 @@ export function InstallPrompt() {
         <div className="mx-auto flex w-full max-w-md flex-col">
           <DrawerHeader className="items-center gap-1 md:text-center">
             <PondCubeLogo className="mb-2 size-14" />
-            <DrawerTitle className="text-lg">Install PondCube</DrawerTitle>
+            <DrawerTitle>Install PondCube</DrawerTitle>
             <DrawerDescription>
               Opens from your home screen, works without signal and keeps saved records safe on this device.
             </DrawerDescription>
@@ -125,16 +127,7 @@ export function InstallPrompt() {
               <p className="text-muted-foreground">
                 Opened the link from another app? Open it in {BROWSER[platform]} first.
               </p>
-              <ol className="flex flex-col gap-3">
-                {STEPS[platform].map((step, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground">
-                      {i + 1}
-                    </span>
-                    <span className="leading-7">{step}</span>
-                  </li>
-                ))}
-              </ol>
+              <Steps steps={STEPS[platform]} />
             </div>
           )}
           <DrawerFooter className="pt-4">
@@ -173,9 +166,9 @@ function WaitingAlert() {
 // Looks like the button to tap: its label, its icon or both.
 function Tap({ icon: Icon, children }: { icon?: LucideIcon; children?: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border bg-muted px-1.5 align-middle leading-6 font-medium whitespace-nowrap text-foreground">
+    <Badge variant="outline" className="align-middle">
       {children}
-      {Icon && <Icon className="size-4" />}
-    </span>
+      {Icon && <Icon data-icon="inline-end" />}
+    </Badge>
   );
 }

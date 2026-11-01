@@ -8,16 +8,21 @@ features the second, fixes the third.
 
 ### Changed
 
-- Water readings are now taken in rounds, as the operators asked. Pick an area once and its ponds are listed with dissolved oxygen and temperature side by side. Type the two readings and tap Next: the app saves them and moves to the next pond, about two taps per pond instead of six. A pond left empty is skipped, and no reading is made for it.
-- Next stays in the same place under your thumb. The entry bar moves to the top of the screen when you tap into it or tap a pond, and the list then follows it.
-- On a pond where nothing has been typed, Next works only once the pond has been on screen for a second, so a double tap can't skip a pond.
-- Each reading takes the time you tap Next, so there's no date to set. To type in readings written down on paper, turn on Typing from paper and set when you took them. After more than half an hour away from the app, it asks for that date and time again.
+- Water readings are now taken in rounds, as the operators asked. Pick an area once and its ponds are listed with dissolved oxygen and temperature side by side. Type the two readings and tap Save: the app saves them and moves to the next pond, about two taps per pond instead of six. On a pond left empty the same button says Skip, and no reading is made for it.
+- Save stays in the same place under your thumb. The entry bar moves to the top of the screen when you tap into it or tap a pond, and the list then follows it.
+- Each pond in the list says where its reading is: Saved, Waiting (kept on this phone until it can be sent) or Not saved. The entry bar confirms each save as you go, and shows how far you got and how many are waiting.
+- On a pond where nothing has been typed, Skip works only once the pond has been on screen for a second, so a double tap can't skip a pond.
+- Each reading takes the time you tap Save, so there's no date to set. To type in readings written down on paper, turn on Typing from paper and set when you took them. After more than half an hour away from the app, it asks for that date and time again.
 - The app shows how far you got in the round, even after closing it, and starts a new round on its own in the afternoon and the next day. It keeps saving with no signal, as before.
 - pH, ammonia, nitrate, nitrite and remarks are under More readings, on the pond that needs them. They close again on the next pond.
-- A reading typed earlier and never saved (on another day, or by someone else on this phone) shows on its pond, but it's saved only if you tap Next a second time or type over it.
+- A reading typed earlier and never saved (on another day, or by someone else on this phone) shows on its pond, but it's saved only if you tap Save a second time or type over it.
 - To correct a reading during the round, tap its pond and type the new values. They replace the old ones in the download, its averages and the data link, at the time of the reading they correct, even if you correct it after noon. The old values are kept in the database.
 - The pond list on the Feeding, Mortality and Sampling tabs is grouped by area, and those tabs open on the pond the round has reached.
-- The notice about records waiting to send no longer appears while a record is sending normally, so the screen doesn't jump.
+- The notice about records waiting to send no longer appears while a record is sending normally, so the screen doesn't jump. On the Water tab it sits under the entry bar, so Save stays under your thumb when the signal drops.
+- Easier to read: the links at the bottom of the screen in dark mode, red warnings and errors, and grey helper text.
+- The app now looks and reads the same in every section. A record's state has the same word, icon and colour everywhere. Units are always in the field's name, every optional field says Optional, and the free-text box is always called Remarks. Numbered instructions and tabs look the same everywhere, and the sign-in page has the app's header.
+- Every button and field is now big enough to tap easily, including the date button, the pond field, the theme button, the Typing from paper switch and the links at the bottom of the screen.
+- The screen no longer jumps as the app finishes loading.
 
 ## [0.10.0] - 2026-10-30
 

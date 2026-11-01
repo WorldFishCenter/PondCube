@@ -19,7 +19,7 @@ import { DataSheet } from "./data-sheet";
 import { FeedbackSheet } from "./feedback-sheet";
 import { OutboxAlert, useOutbox } from "./outbox";
 import { PondCombobox, type Pond } from "./pond-combobox";
-import { RecordedAtField, type RecordFormProps } from "./record-form";
+import { FILLED_TAB, RecordedAtField, type RecordFormProps } from "./record-form";
 import { WaterRound } from "./water-round";
 import { FeedingForm, type Feed } from "./feeding-form";
 import { MortalityForm } from "./mortality-form";
@@ -37,11 +37,6 @@ const TABS = {
   mortality: { label: "Mortality", Form: MortalityForm },
   sampling: { label: "Sampling", Form: SamplingForm },
 } satisfies Record<RecordKind, { label: string; Form?: React.ComponentType<RecordFormProps & { feeds: Feed[] }> }>;
-
-// The selected record kind is filled with the primary colour. Stock Tabs has no filled variant,
-// so this is shadcn's className step with semantic tokens; the dark: ones beat the stock dark style.
-const FILLED_TAB =
-  "data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:border-transparent dark:data-active:bg-primary dark:data-active:text-primary-foreground";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -67,8 +62,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
 export function CollectionSkeleton() {
   return (
     <Shell>
-      <Skeleton className="h-56 w-full rounded-xl md:h-40" />
-      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-72 w-full rounded-xl md:h-44" />
+      <Skeleton className="h-12.5 w-full" />
       <Skeleton className="h-96 w-full rounded-xl" />
     </Shell>
   );
@@ -139,7 +134,7 @@ export function CollectionApp({
           <CardDescription>
             You&apos;re recording as the signed-in operator.{" "}
             {kind === "wq"
-              ? "Each reading takes the time you tap Next."
+              ? "Each reading takes the time you tap Save."
               : "The pond is remembered on this device. Set the date & time for each record."}
           </CardDescription>
         </CardHeader>
@@ -161,6 +156,7 @@ export function CollectionApp({
                   </FieldContent>
                   <Switch
                     id="past-readings"
+                    className="after:-inset-y-3.5" // a 44px touch target, as the app's other controls
                     checked={past !== null}
                     onCheckedChange={(on) => setPast(on ? "" : null)}
                   />
@@ -182,14 +178,15 @@ export function CollectionApp({
                 </div>
               </>
             )}
-            <OutboxAlert outbox={outbox} className="md:col-span-2" />
+            {/* In a Round it's under the bar: above, it would move Save. */}
+            {kind !== "wq" && <OutboxAlert outbox={outbox} className="md:col-span-2" />}
           </FieldGroup>
         </CardContent>
       </Card>
 
       {!restored ? (
         <>
-          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12.5 w-full" />
           <Skeleton className="h-96 w-full rounded-xl" />
         </>
       ) : (

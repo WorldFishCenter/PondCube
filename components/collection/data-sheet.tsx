@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { Check, Copy, Download } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Check, Copy, Download, Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldDescription,
@@ -21,10 +22,12 @@ import {
   InputGroupText,
 } from "@/components/ui/input-group";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Steps } from "@/components/steps";
 import type { ViewName } from "@/lib/export";
 import type { RecordKind } from "@/lib/validation";
-import { Choice } from "./record-form";
+import { Choice, FILLED_TAB } from "./record-form";
 
 // Seeing the data (docs/architecture.md): a month of water quality as an Excel file, and a data link of CSVs.
 const MONTHS = 24; // ponytail: the last two years; offer older months when someone asks
@@ -81,10 +84,13 @@ function ExcelDownload({ sites }: { sites: string[] }) {
           An Excel file: every reading, a tab per area laid out like the old log, and averages.
         </FieldDescription>
       </Field>
-      <a className={buttonVariants()} href={`/api/download?${new URLSearchParams({ site, month })}`} download>
+      <Button
+        nativeButton={false}
+        render={<a href={`/api/download?${new URLSearchParams({ site, month })}`} download />}
+      >
         <Download data-icon="inline-start" />
         Download Excel file
-      </a>
+      </Button>
     </>
   );
 }
@@ -134,18 +140,14 @@ function DataLink({ yours, labels }: { yours: string; labels: Record<ViewName, {
           <Tabs defaultValue={APPS[0].name}>
             <TabsList className="w-full">
               {APPS.map((app) => (
-                <TabsTrigger key={app.name} value={app.name}>
+                <TabsTrigger key={app.name} value={app.name} className={FILLED_TAB}>
                   {app.name}
                 </TabsTrigger>
               ))}
             </TabsList>
             {APPS.map((app) => (
               <TabsContent key={app.name} value={app.name} className="flex flex-col gap-3 pt-2">
-                <ol className="list-decimal space-y-1 pl-5 text-sm">
-                  {app.steps.map((step) => (
-                    <li key={step}>{step}</li>
-                  ))}
-                </ol>
+                <Steps steps={app.steps} />
                 {Object.entries(link.links).map(([file, url]) => {
                   const { label } = labels[file as ViewName];
                   const line = app.paste(url);
@@ -165,14 +167,24 @@ function DataLink({ yours, labels }: { yours: string; labels: Record<ViewName, {
             ))}
           </Tabs>
           <FieldDescription>Shown only now: copy what you need before closing this.</FieldDescription>
-          <p className="text-xs break-all text-muted-foreground">
-            Keep these lines like a password: anyone with one can see the records. Pasted into a sheet or workbook, the
-            key is in that file too, so share the file only with people who may see them. Making a new link stops the
-            old ones. The key on its own, for a ready-made Excel template: <span className="font-mono">{link.key}</span>
-          </p>
+          <Alert>
+            <Info />
+            <AlertTitle>Keep these lines like a password</AlertTitle>
+            <AlertDescription>
+              <p>
+                Anyone with one can see the records. Pasted into a sheet or workbook, the key is in that file too, so
+                share the file only with people who may see them. Making a new link stops the old ones.
+              </p>
+              <p>
+                The key on its own, for a ready-made Excel template:{" "}
+                <span className="font-mono break-all">{link.key}</span>
+              </p>
+            </AlertDescription>
+          </Alert>
         </>
       )}
       <Button variant="outline" onClick={make} disabled={state === "making"}>
+        {state === "making" && <Spinner data-icon="inline-start" />}
         {link ? "Make a new data link" : "Make a data link"}
       </Button>
       {state === "failed" && <FieldError>Couldn&apos;t make the link. Check your signal and try again.</FieldError>}
@@ -187,7 +199,7 @@ function CopyButton({ text, name }: { text: string; name: string }) {
       onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}
       aria-label={`Copy ${name}`}
     >
-      {copied ? <Check /> : <Copy />}
+      {copied ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
       {copied ? "Copied" : "Copy"}
     </InputGroupButton>
   );

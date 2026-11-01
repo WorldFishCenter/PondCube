@@ -4,7 +4,7 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { useWatch } from "react-hook-form";
 import { format } from "date-fns";
-import { Check, ChevronDownIcon, CloudUpload, Info, Pencil } from "lucide-react";
+import { CheckCircle2, ChevronDownIcon, Info, Pencil } from "lucide-react";
 import { periodAt, PERIODS } from "@/lib/options";
 import {
   areasOf,
@@ -22,7 +22,7 @@ import {
   type Marks,
 } from "@/lib/round";
 import { readLocal, writeLocal } from "@/lib/storage";
-import { RANGES, waterQualityForm } from "@/lib/validation";
+import { waterQualityForm } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -30,12 +30,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { records, type Outbox } from "./outbox";
+import { noticeShown, OutboxAlert, type Outbox } from "./outbox";
 import type { Pond } from "./pond-combobox";
-import { Choice, NotesField, NumberField, ResultAlert, useRecordForm } from "./record-form";
+import {
+  Choice,
+  NotesField,
+  NumberField,
+  ResultAlert,
+  STATUS,
+  StatusBadge,
+  type Status,
+  useRecordForm,
+} from "./record-form";
 
 const AREA_KEY = "pondcube:lastArea";
-const SETTLE = 1000; // ms a Pond shows before an untyped Next works: a tap before its number is read mustn't skip it
+const SETTLE = 1000; // ms a Pond shows before Skip works: a tap before its number is read mustn't skip it
 const COLUMNS = "grid grid-cols-[3.5rem_1fr_1fr_4.5rem] gap-2";
 
 const REQUIRED = [
@@ -44,15 +53,14 @@ const REQUIRED = [
 ] as const;
 // In the order of the old log.
 const OPTIONAL = [
-  { name: "ph", label: "pH", hint: `${RANGES.ph.join("–")}, optional` },
-  { name: "ammonia", label: "Ammonia", hint: "mg/L, optional" },
-  { name: "nitrate", label: "Nitrate", hint: "mg/L, optional" },
-  { name: "nitrite", label: "Nitrite", hint: "mg/L, optional" },
+  { name: "ph", label: "pH" },
+  { name: "ammonia", label: "Ammonia (mg/L)" },
+  { name: "nitrate", label: "Nitrate (mg/L)" },
+  { name: "nitrite", label: "Nitrite (mg/L)" },
 ] as const;
-const MORE = [...OPTIONAL.map((o) => o.name), "remarks"] as const;
 
 const blank = () => ({
-  period: "morning" as (typeof PERIODS)[number]["value"], // set from Recorded-at on each Next
+  period: "morning" as (typeof PERIODS)[number]["value"], // set from Recorded-at on each Save
   dissolvedOxygen: "",
   temperature: "",
   ph: "",
@@ -60,7 +68,7 @@ const blank = () => ({
   nitrite: "",
   nitrate: "",
   remarks: "",
-  replaces: "", // set on each Next
+  replaces: "", // set on each Save
 });
 
 // Keeps the keyboard up: a tap here mustn't take focus away from the input being typed in.
@@ -96,23 +104,21 @@ export function WaterRound({
   }, []);
 
   const area = areas.find((a) => a.value === chosen) ?? areas[0];
-  if (!area)
-    return (
+  // No bar to put the Outbox notice under.
+  const stop = (title: string, text: string) => (
+    <div className="flex flex-col gap-2">
       <Alert>
         <Info />
-        <AlertTitle>No ponds</AlertTitle>
-        <AlertDescription>There are no ponds on your list yet. Ask your supervisor.</AlertDescription>
+        <AlertTitle>{title}</AlertTitle>
+        <AlertDescription>{text}</AlertDescription>
       </Alert>
-    );
+      <OutboxAlert outbox={outbox} />
+    </div>
+  );
+  if (!area) return stop("No ponds", "There are no ponds on your list yet. Ask your supervisor.");
   // Not set yet, or its time was cleared.
   if (past !== null && Number.isNaN(Date.parse(past)))
-    return (
-      <Alert>
-        <Info />
-        <AlertTitle>Set the date &amp; time</AlertTitle>
-        <AlertDescription>Above, choose when you took the readings you wrote down.</AlertDescription>
-      </Alert>
-    );
+    return stop("Set the date & time", "Above, choose when you took the readings you wrote down.");
   const round = past ? roundAt(past) : liveRound(now);
   return (
     // Keyed: another Area or Round picks up where it got to, with its own marks.
@@ -157,12 +163,14 @@ function AreaRound({
   const [marks, setMarks] = React.useState<Marks>(() => readMarks(round));
   const [current, setCurrent] = React.useState(() => resumePond(codes, marks));
   const [moreFor, setMoreFor] = React.useState(""); // the Pond with More readings open: closed on the next one
-  const [check, setCheck] = React.useState(""); // the Pond whose values were typed earlier: Next once more saves them
+  const [check, setCheck] = React.useState(""); // the Pond whose values were typed earlier: Save once more keeps them
+  const [last, setLast] = React.useState(""); // the Pond saved last, for the bar's confirmation
+  const [badInput, setBadInput] = React.useState(false); // text a number input can't read: blank to the form, not empty
   const settleUntil = React.useRef(0); // performance.now(), which a change of the device clock can't stall
   const typedNow = React.useRef(new Set<string>()); // Ponds typed at since this Round opened on screen
   const saving = React.useRef(false);
   const top = React.useRef<HTMLDivElement>(null);
-  const stamp = React.useRef(""); // set at each Next: a Round lasts over an hour, and each reading keeps its own time
+  const stamp = React.useRef(""); // set at each Save: a Round lasts over an hour, and each reading keeps its own time
   const recordedAt = {
     get value() {
       return stamp.current;
@@ -184,6 +192,7 @@ function AreaRound({
     onSaved: ({ id, dissolvedOxygen, temperature }) => {
       const saved = { id, dissolvedOxygen, temperature, at: stamp.current };
       setMarks(keepMark(round, marks, current, saved, past ? null : new Date()));
+      setLast(current);
       move(pondAfter(codes, marks, current));
     },
   });
@@ -195,13 +204,19 @@ function AreaRound({
     control,
     formState: { errors },
   } = form;
-  const typedMore = useWatch({ control, name: MORE }).some((v) => String(v ?? "").trim());
+  // Renders only when one of these flips, not on each keystroke: 120 rows hang off this.
+  const { noValues, typedMore } = useWatch({
+    control,
+    compute: (v) => ({ noValues: isBlank(v), typedMore: !isBlank({ ...v, dissolvedOxygen: "", temperature: "" }) }),
+  });
+  const empty = noValues && !badInput; // only for showing: Save decides from the form itself
   const showMore = moreFor === current || typedMore; // never hides a value, or an error on one
 
   const move = React.useCallback(
     (pondCode: string) => {
       clearResult();
       setCheck("");
+      setBadInput(false);
       setCurrent(pondCode);
       if (pondCode) onPond(pondCode);
     },
@@ -242,18 +257,25 @@ function AreaRound({
     },
     [setFocus, move],
   );
+  const notice = noticeShown(outbox);
+  // `notice`: it sits above the rows, so they moved when it came or went.
   React.useEffect(() => {
     if (!showMore) follow(top.current, current, false);
-  }, [current, showMore]);
+  }, [current, showMore, notice]);
   const lift = () => {
     if (!showMore) follow(top.current, current, true);
   };
 
   const waiting = new Set([...outbox.mine, ...outbox.others].map((w) => w.record.id));
-  // Only a Pond the bar has left changes here: read once per move, not on each of a Next's renders.
+  // Only a Pond the bar has left changes here: read once per move, not on each of a Save's renders.
   const typed = React.useMemo(() => typedDrafts(codes.filter((c) => c !== current)), [codes, current]);
+  const statusOf = (code: string): Status | null =>
+    code in typed ? "typed" : !marks[code] ? null : waiting.has(marks[code].id) ? "waiting" : "saved";
+  const lastStatus = statusOf(last);
   const done = codes.filter((c) => marks[c]).length;
   const mark = marks[current];
+  const hint =
+    mark && empty ? "Type to correct this reading" : current && !lastStatus ? "Type the readings, then tap Save" : "";
   const period = PERIODS.find((p) => p.value === periodAt(past ?? localTime(now)))?.label;
   const failure = card.result && !card.result.ok ? card.result : null;
   const wrong = REQUIRED.map(({ name }) => errors[name]).filter(Boolean);
@@ -268,26 +290,41 @@ function AreaRound({
               Area
             </FieldLabel>
             <Choice id="round-area" items={areas} value={area.value} onChange={(v) => v && chooseArea(v)} />
-            <Badge variant="secondary">{period}</Badge>
+            <Badge variant="outline">{period}</Badge>
             <Badge variant="outline">{past ? format(new Date(past), "d MMM, HH:mm") : format(now, "d MMM")}</Badge>
           </div>
-          {/* Its own line, so the bar doesn't change height when something starts waiting: Next must stay put. */}
-          <p className="text-xs text-muted-foreground tabular-nums">
-            {done} of {list.length}
-            {waiting.size > 0 && ` · ${records(waiting.size)} waiting to send`}
-          </p>
+          {/* A line of its own and a fixed height, so nothing here moves the bar: Save must stay put. */}
+          <div className="flex min-h-5 items-center justify-between gap-2 text-xs">
+            <span className="truncate tabular-nums">
+              {done} of {list.length} ponds
+              {waiting.size > 0 && ` · ${waiting.size} to send`}
+            </span>
+            <span role="status" className="flex min-w-0 justify-end">
+              {hint ? (
+                <span className="truncate text-muted-foreground">{hint}</span>
+              ) : (
+                lastStatus && (
+                  // Keyed: from one Pond to the next only a number changes, and each save must show.
+                  <StatusBadge key={last} status={lastStatus} className="animate-in zoom-in-95 fade-in">
+                    Pond {pondNumber(last)} {STATUS[lastStatus].word.toLowerCase()}
+                  </StatusBadge>
+                )
+              )}
+            </span>
+          </div>
           {current ? (
             <form
               noValidate
               onSubmit={next}
-              onInput={() => {
+              onInput={(e) => {
+                setBadInput(e.currentTarget.matches(":invalid"));
                 settleUntil.current = 0;
                 typedNow.current.add(current);
                 setCheck("");
               }}
               className="flex flex-col gap-2"
             >
-              <div className={cn(COLUMNS, "items-end")}>
+              <FieldGroup className={cn(COLUMNS, "items-end")}>
                 <div>
                   <div className="text-xs text-muted-foreground">Pond</div>
                   <div id="round-pond" className="text-2xl font-semibold tabular-nums">
@@ -318,17 +355,22 @@ function AreaRound({
                     />
                   </Field>
                 ))}
-                <Button type="submit" onMouseDown={keepFocus} disabled={card.pending}>
-                  Next
+                <Button
+                  type="submit"
+                  variant={empty ? "outline" : "default"}
+                  onMouseDown={keepFocus}
+                  disabled={card.pending}
+                >
+                  {empty ? "Skip" : "Save"}
                 </Button>
-              </div>
+              </FieldGroup>
               {wrong.length > 0 && <FieldError errors={wrong} />}
               {check === current && (
                 <Alert>
-                  <Info />
+                  <Pencil />
                   <AlertTitle>Typed earlier, not saved</AlertTitle>
                   <AlertDescription>
-                    Check these values, then tap Next again to save them, or type over them.
+                    Check these values, then tap Save again to keep them, or type over them.
                   </AlertDescription>
                 </Alert>
               )}
@@ -339,7 +381,10 @@ function AreaRound({
                 size="sm"
                 className="self-start"
                 aria-expanded={showMore}
-                onClick={() => setMoreFor((was) => (was === current ? "" : current))}
+                onClick={() => {
+                  setMoreFor((was) => (was === current ? "" : current));
+                  setBadInput(false); // the unreadable text may be in an input this closes
+                }}
               >
                 <ChevronDownIcon data-icon="inline-start" className={cn(showMore && "rotate-180")} />
                 More readings
@@ -347,12 +392,12 @@ function AreaRound({
               {showMore && (
                 <FieldGroup>
                   <FieldGroup className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    {OPTIONAL.map(({ name, label, hint }) => (
+                    {OPTIONAL.map(({ name, label }) => (
                       <NumberField
                         key={name}
                         id={`round-${name}`}
                         label={label}
-                        hint={hint}
+                        hint="Optional."
                         error={errors[name]}
                         readOnly={card.pending}
                         {...register(name)}
@@ -365,7 +410,7 @@ function AreaRound({
             </form>
           ) : (
             <Alert>
-              <Check />
+              <CheckCircle2 />
               <AlertTitle>End of {area.label}</AlertTitle>
               <AlertDescription>
                 {done} of {list.length} ponds have a reading in this round. Tap a pond to add or correct one, or pick
@@ -375,10 +420,10 @@ function AreaRound({
           )}
         </CardContent>
       </Card>
+      <OutboxAlert outbox={outbox} />
       <Card size="sm" className="gap-0 py-0">
         {codes.map((pondCode) => {
-          const isTyped = pondCode in typed;
-          const reading = isTyped ? typed[pondCode] : marks[pondCode];
+          const reading = typed[pondCode] ?? marks[pondCode];
           return (
             <PondRow
               key={pondCode}
@@ -386,9 +431,7 @@ function AreaRound({
               isCurrent={pondCode === current}
               oxygen={String(reading?.dissolvedOxygen ?? "")}
               temperature={String(reading?.temperature ?? "")}
-              status={
-                isTyped ? "typed" : !marks[pondCode] ? "none" : waiting.has(marks[pondCode].id) ? "waiting" : "saved"
-              }
+              status={statusOf(pondCode)}
               open={open}
             />
           );
@@ -398,7 +441,7 @@ function AreaRound({
   );
 }
 
-// The list follows the bar once it's at the top; only a tap other than Next (`lift`) takes it there.
+// The list follows the bar once it's at the top; only a tap other than Save (`lift`) takes it there.
 function follow(bar: HTMLElement | null, pondCode: string, lift: boolean) {
   const barTop = bar?.getBoundingClientRect().top;
   const row = document.getElementById(`round-${pondCode}`)?.getBoundingClientRect();
@@ -406,14 +449,7 @@ function follow(bar: HTMLElement | null, pondCode: string, lift: boolean) {
   window.scrollTo({ top: window.scrollY + Math.max(barTop, row.top + row.height / 2 - window.innerHeight / 2) });
 }
 
-const STATUS = {
-  none: null,
-  typed: { Icon: Pencil, label: "Typed, not saved: tap to finish" },
-  waiting: { Icon: CloudUpload, label: "Saved on this device, waiting to send" },
-  saved: { Icon: Check, label: "Saved" },
-};
-
-// Memo: an Area can have 120 rows, and each Next changes two of them.
+// Memo: an Area can have 120 rows, and each Save changes two of them.
 const PondRow = React.memo(function PondRow({
   pondCode,
   isCurrent,
@@ -426,10 +462,9 @@ const PondRow = React.memo(function PondRow({
   isCurrent: boolean;
   oxygen: string;
   temperature: string;
-  status: keyof typeof STATUS;
+  status: Status | null;
   open: (code: string) => void;
 }) {
-  const shown = STATUS[status];
   return (
     <Button
       type="button"
@@ -446,11 +481,7 @@ const PondRow = React.memo(function PondRow({
       <span className="font-medium">{pondNumber(pondCode)}</span>
       <span>{oxygen}</span>
       <span>{temperature}</span>
-      {shown && (
-        <span className="justify-self-end text-muted-foreground" title={shown.label}>
-          <shown.Icon aria-label={shown.label} />
-        </span>
-      )}
+      {status && <StatusBadge status={status} className="justify-self-end" />}
     </Button>
   );
 });

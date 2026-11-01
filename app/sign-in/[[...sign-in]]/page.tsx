@@ -1,13 +1,14 @@
 import { Suspense } from "react";
-import { SignIn } from "@clerk/nextjs";
+import { Shell } from "@/components/collection/collection-app";
+import { SignInCard } from "@/components/sign-in-card";
 
 // SignIn reads the catch-all path, so it streams in after the static shell.
 export default function SignInPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <Shell>
       <Suspense>
-        <SignIn withSignUp />
+        <SignInCard />
       </Suspense>
-    </div>
+    </Shell>
   );
 }

@@ -59,10 +59,10 @@
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  --muted-foreground: oklch(0.54 0.016 285.938); /* darker than the preset: 4.5:1 on --muted too */
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.53 0.225 27.325); /* darker than the preset: 4.5:1 on a destructive Badge's tint */
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.705 0.015 286.067);
@@ -136,12 +136,14 @@
   :root {
     --touch-target: 2.75rem;
   }
+  /* By suffix: a Button rendered as a Sheet's trigger or a Drawer's close takes that slot's name. */
   [data-slot="input"],
   [data-slot="input-group"],
-  [data-slot="select-trigger"],
-  [data-slot="button"],
+  [data-slot="input-group-control"],
+  [data-slot$="button"],
+  [data-slot$="-trigger"],
+  [data-slot$="-close"],
   [data-slot="toggle-group-item"],
-  [data-slot="tabs-trigger"],
   [data-slot="select-item"],
   [data-slot="combobox-item"] {
     min-height: var(--touch-target);
@@ -149,7 +151,14 @@
   [data-slot="tabs-list"] {
     min-height: calc(var(--touch-target) + 6px);
   }
-  [data-slot="button"]:has(> svg:only-child) {
+  [data-slot$="button"]:has(> svg:only-child),
+  [data-slot$="button"]:has(> .sr-only),
+  [data-slot$="-close"]:has(> .sr-only) {
     min-width: var(--touch-target);
+  }
+
+  /* Teal text: in dark, --primary is a fill, too dark to read as text. */
+  .dark .text-primary {
+    --primary: var(--sidebar-primary);
   }
 }

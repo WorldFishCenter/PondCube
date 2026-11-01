@@ -175,19 +175,21 @@ storage: for the same reason the drawer warns about Records waiting in the Outbo
 
 The Water tab is a Round (`components/collection/water-round.tsx`), built on the Penang operators' feedback of
 2026-10-31: almost 245 Ponds a round, at least six taps per Pond with one form per Record. An Area is picked once.
-A bar with the Pond reached, its two required readings and Next sits over a list of the Area's Ponds. The inputs stay
-the same elements from Pond to Pond, so the keyboard stays up. Next never moves under the thumb: the page scrolls to
-bring the bar to the top only on a tap into it or on a row, and once it's there the list scrolls under it.
+A bar with the Pond reached, its two required readings and one button sits over a list of the Area's Ponds. The button
+says Save once something is typed and Skip on an empty Pond. The inputs stay the same elements from Pond to Pond, so
+the keyboard stays up. The button never moves under the thumb: the page scrolls to bring the bar to the top only on a
+tap into it or on a row, and once it's there the list scrolls under it. A Pond's state is one Badge, the same in its
+row and in the bar's confirmation: Saved, Waiting (in the Outbox) or Not saved (a Draft left behind). The Outbox notice
+sits under the bar on this tab, not in the top panel, so it can't move the button when it comes or goes.
 
-There's no new write path and no schema change: the bar is one record form (`useRecordForm`) on the Pond reached, so
-each Pond has its Draft, and each Next puts one Record in the Outbox. Next never waits for the network. A Pond left
-blank makes no Record. Retyping a Pond that has a reading in this Round makes a Correction: a new Record that names
+There's no new write path: the bar is one record form (`useRecordForm`) on the Pond reached, so each Pond has its
+Draft, and each Save puts one Record in the Outbox, never waiting for the network. A Pond left blank makes no Record. Retyping a Pond that has a reading in this Round makes a Correction: a new Record that names
 the reading it replaces (its mark's id) and keeps its Recorded-at, so it lands in the same cell even past noon. The
 export leaves the replaced one out, whatever order the two arrive in. The Outbox sends oldest first anyway.
 
-What keeps a reading on its Pond: on a Pond nothing was typed at, Next works only after it has shown for a second
+What keeps a reading on its Pond: on a Pond nothing was typed at, Skip works only after it has shown for a second
 (a double tap must not skip a Pond). A Draft that wasn't typed while this Round was on screen (another day, a reload,
-another Operator) needs a second Next. A row tap waits while a save is in progress. The other tabs follow the Pond the
+another Operator) needs a second Save. A row tap waits while a save is in progress. The other tabs follow the Pond the
 Round reached. The time set with Typing from paper clears after 30 minutes away from the app, as a phone mostly
 sleeps rather than reloads.
 
@@ -198,7 +200,7 @@ minutes apart at most), so its marks don't vanish if it runs past noon. The Peri
 hour, as everywhere else, so readings after noon are afternoon ones. That's still to be confirmed with the Operators
 (when does a round run?); if rounds do run past noon, it's `periodAt` and the `PERIOD` of `export_wq`.
 
-Tested in a desktop browser at phone size, not yet on a real iPhone: there, check that the keyboard stays up on Next.
+Tested in a desktop browser at phone size, not yet on a real iPhone: there, check that the keyboard stays up on Save.
 
 ### Saving without signal (the Outbox)
 

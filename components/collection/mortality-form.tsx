@@ -50,7 +50,7 @@ export function MortalityForm(props: RecordFormProps) {
           />
         )}
       />
-      <NotesField id="mo-r" label="Note" {...register("noteDeath")} />
+      <NotesField id="mo-r" {...register("noteDeath")} />
     </RecordCard>
   );
 }

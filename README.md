@@ -36,7 +36,7 @@ The four kinds of observation:
 
 - **Water quality** — dissolved oxygen and temperature, plus pH, ammonia, nitrite
   and nitrate when taken, logged for the morning or afternoon round. Taken in rounds through an area: two readings,
-  Next, and on to the next pond.
+  Save, and on to the next pond.
 - **Feeding** — how much feed went into the pond, with the feed used (from the
   site's own list) and number of feedings.
 - **Mortality** — how many fish were removed dead, and the cause of death.

@@ -53,10 +53,12 @@ components/theme-provider.tsx, theme-toggle.tsx   shadcn dark mode (next-themes)
 components/pondcube-logo.tsx   Logo mark for in-app use (same artwork as app/icon.svg)
 components/install-prompt.tsx  "Install the app" link + drawer (opens itself once, on load, on a first visit in a phone
                           browser): install steps per platform; one-tap Install where the browser offers it. In app/page.tsx
+components/steps.tsx      Numbered instructions (install drawer, data sheet)
+components/sign-in-card.tsx  Clerk's sign-in, with the app's width and touch size (both sign-in routes)
 components/collection/*    App UI: shell (who/where/when panel, record kinds → tabs), not-on-list card, pond picker,
                           water-round.tsx = the Water tab, a Round through an Area (one form on the Pond reached, rows below);
                           the 3 other forms, feedback sheet (Airtable form), data sheet ("Your data": download + data link);
-                          record-form.tsx = shared form hook (draft, save) + fields;
+                          record-form.tsx = shared form hook (draft, save) + fields + STATUS, StatusBadge, FILLED_TAB;
                           outbox.tsx = sending to app/api/records + the "waiting to send" notice
 lib/schema.ts             Drizzle tables and export views (PROVISIONAL names) — the single source of truth for the data model
 lib/export.ts             Seeing the data: readRows (the only site filter on rows people see), data link keys, CSV
@@ -120,6 +122,11 @@ These favour care over speed; on trivial tasks, use judgment.
   what changed, improved or got fixed, in plain words. No code, file or library names.
   Pushing to `main` with a new top version publishes a GitHub release (tag `vX.Y.Z`, notes =
   that section) via `.github/workflows/release.yaml`; it fails if `package.json` disagrees.
+- **One look for one meaning, in every section.** A Record's state has one word, icon and colour (`STATUS` in
+  `record-form.tsx`); Badge variants mean only that (context badges are `outline`). Units go in the field's label, in
+  brackets. An optional field says "Optional." under it, a required one says nothing. Free text is always "Remarks".
+  Every tap target is 44px, set once in `app/globals.css`; text reaches 4.5:1 in both themes. Fix a miss there, in
+  the shared component or in a token, not at one call site.
 - **shadcn/ui components are generated, not authored.** Everything in
   `components/ui/*` comes from the shadcn CLI. Update them with
   `npx shadcn@latest add <component>`; never hand-edit. This Next.js version has
