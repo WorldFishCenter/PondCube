@@ -347,7 +347,7 @@ function AreaRound({
                   </Field>
                 ))}
               </FieldGroup>
-              {/* Right above the keyboard, where the thumb is. Anything that comes and goes stays below it. */}
+              {/* Anything that comes and goes stays below this row, so Save doesn't move. */}
               <div className="flex gap-2">
                 <Button
                   type="button"

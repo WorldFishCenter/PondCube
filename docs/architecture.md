@@ -185,7 +185,8 @@ only what changes at each Pond; the Period and date, which don't, head the list.
 
 Number fields, on every tab, are text with a number keypad, not `type="number"`: browsers read that per device and
 region (`1,500` as 1.5 or as nothing, `1,5` as 1.5 or as nothing). `toNumber` in `lib/validation.ts` reads what's
-typed instead, the same everywhere: a decimal comma is a point, and a comma before three digits is refused.
+typed instead, the same everywhere: a comma is a decimal comma, since some keypads have no point. Only where a field
+allows 1000 or more can `1,500` be thousands, so there it's refused rather than guessed.
 
 There's no new write path: the bar is one record form (`useRecordForm`) on the Pond reached, so each Pond has its
 Draft, and each Save puts one Record in the Outbox, never waiting for the network. A Pond left blank makes no Record. Retyping a Pond that has a reading in this Round makes a Correction: a new Record that names

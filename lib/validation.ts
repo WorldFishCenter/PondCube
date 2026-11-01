@@ -1,13 +1,15 @@
 import { z } from "zod";
 import { CAUSES, PERIODS } from "./options";
 
-// What's typed, read the same on every device; NaN then fails z.number. A decimal comma is a point, except before
-// three digits, where it may be thousands: "1,500" is refused, never read as 1.5.
-const toNumber = (v: unknown) => {
+// What's typed, read the same on every device; NaN then fails z.number. A comma is a decimal comma: some phones' keypads
+// have no point. Only where a field allows a thousand or more can "1,500" be thousands, so there it's refused, not guessed.
+const toNumber = (max: number) => (v: unknown) => {
   if (typeof v !== "string") return v ?? undefined;
-  const text = v.trim().replace(/,(?=\d{1,2}$)/, ".");
+  const text = v.trim();
   if (!text) return undefined;
-  return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(text) ? Number(text) : NaN;
+  if (max >= 1000 && /^[-+]?[1-9]\d{0,2},\d{3}$/.test(text)) return NaN;
+  const decimal = text.replace(/,(?=\d*$)/, ".");
+  return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(decimal) ? Number(decimal) : NaN;
 };
 
 // One source for choice values: the option lists the UI renders.
@@ -32,7 +34,7 @@ const optNum = (min?: number, max?: number, int = false) => {
   if (int) s = s.int("Must be a whole number");
   if (min !== undefined) s = s.min(min, `Must be ≥ ${min}`);
   if (max !== undefined) s = s.max(max, `Must be ≤ ${max}`);
-  return z.preprocess(toNumber, s.optional());
+  return z.preprocess(toNumber(max ?? Infinity), s.optional());
 };
 
 // A blank note is no note: stored as null, never "".
@@ -47,7 +49,7 @@ const reqNum = (min: number, max: number, label: string, int = false) => {
   });
   if (int) s = s.int(`${label} must be a whole number`);
   return z.preprocess(
-    toNumber,
+    toNumber(max),
     s.min(min, `${label}: expected ${min}–${max}`).max(max, `${label}: expected ${min}–${max}`),
   );
 };
@@ -83,7 +85,7 @@ const forSave = {
 export const waterQualityForm = z.object({
   id: madeAtSave(),
   period: enumOf(PERIODS, "Select time of day"),
-  dissolvedOxygen: reqNum(...RANGES.dissolvedOxygen, "Dissolved oxygen"),
+  dissolvedOxygen: reqNum(...RANGES.dissolvedOxygen, "Oxygen"), // as its field is labelled
   temperature: reqNum(...RANGES.temperature, "Temperature"),
   ph: optNum(...RANGES.ph),
   ammonia: optNum(...RANGES.ammonia),

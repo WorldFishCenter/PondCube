@@ -31,22 +31,38 @@ bad(waterQualitySchema, { ...wq, ph: "abc" });
 bad(waterQualitySchema, { ...wq, dissolvedOxygen: "" }); // required
 assert.equal(waterQualitySchema.parse({ ...base, ...wq, ph: "" }).ph, undefined); // optional blank -> undefined
 
-// What's typed reads the same on every device: a decimal point or comma, and nothing is guessed.
+// What's typed reads the same on every device: a decimal point or comma, as many decimals as the meter shows.
 const typed = (v: unknown) => waterQualitySchema.safeParse({ ...base, ...wq, dissolvedOxygen: v });
 for (const [v, want] of [
   ["1.5", 1.5],
   ["1,5", 1.5],
   ["6,25", 6.25],
+  ["5,125", 5.125],
+  ["12,5555", 12.5555], // seen on an iPhone, whose keypad has only a comma
   [",5", 0.5],
   [".5", 0.5],
   ["5.", 5],
+  ["5,", 5], // half typed: not an error yet
   [" 5 ", 5],
+  ["1,500", 1.5], // oxygen stops at 20, so this can't be thousands
   [1e-7, 1e-7], // a number already read on the device, re-checked on the server
 ] as const)
   assert.equal(typed(v).data?.dissolvedOxygen, want, String(v));
-for (const v of ["1,500", "12,345", "1.2.3", "1,2,3", "0x10", "1e1", "Infinity", "-", "abc", "   "])
+for (const v of ["1.2.3", "1,2,3", "0x10", "1e1", "Infinity", "-", ",", "abc", "   "])
   assert.ok(!typed(v).success, `must be refused, not guessed: ${v}`);
 assert.equal(waterQualitySchema.parse({ ...base, ...wq, ph: "   " }).ph, undefined); // spaces are blank, never 0
+assert.equal(waterQualitySchema.parse({ ...base, ...wq, nitrite: "0,025" }).nitrite, 0.025);
+// Only where a thousand or more is allowed can a comma before three digits be thousands: never guessed there.
+const fed = (v: string) => feedingSchema.safeParse({ ...base, feedAmountKg: v });
+for (const v of ["1,500", "12,345", "100,000"]) assert.ok(!fed(v).success, `could be thousands: ${v}`);
+for (const [v, want] of [
+  ["1,5", 1.5],
+  ["1,25", 1.25],
+  ["0,125", 0.125], // thousands never start with 0
+  ["1,5000", 1.5],
+  ["1500", 1500],
+] as const)
+  assert.equal(fed(v).data?.feedAmountKg, want, v);
 
 ok(feedingSchema, { feedAmountKg: "0", feedingsCount: "3" });
 bad(feedingSchema, { feedAmountKg: "-1" });

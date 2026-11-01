@@ -138,7 +138,7 @@ These favour care over speed; on trivial tasks, use judgment.
   before intake. The database never receives an out-of-range value silently. Add a
   bound by editing `RANGES`/the schema, not the UI.
 - **Number fields are text with a number keypad, never `type="number"`.** Browsers read that differently per device and
-  region. `toNumber` (`lib/validation.ts`) reads what's typed, the same everywhere; a comma before three digits is refused.
+  region. `toNumber` (`lib/validation.ts`) reads what's typed, the same everywhere; only where a field allows 1000 or more is `1,500` refused as ambiguous.
 - **Record intake is all-or-nothing.** A record is stored whole or not at all — a
   Sampling event never persists without its Fish measurements. Keep new write paths
   going through `lib/intake.ts`. Every Record carries an id made on the device;
