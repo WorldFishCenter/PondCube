@@ -84,6 +84,7 @@ export const waterQualityForm = z.object({
   nitrite: optNum(...RANGES.nitrite),
   nitrate: optNum(...RANGES.nitrate),
   remarks: note,
+  replaces: z.preprocess((v) => v || undefined, z.uuid().optional()), // a correction: the reading it replaces
 });
 export const waterQualitySchema = waterQualityForm.extend(forSave);
 

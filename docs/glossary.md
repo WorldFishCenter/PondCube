@@ -26,6 +26,11 @@ e.g. `PEN` (Batu Maung). Each has a time zone (e.g. `Asia/Kuala_Lumpur`): the da
 of its Records are in it.
 _Avoid_: location (the old log's word for an area such as Fish Tank 3)
 
+**Area**
+A named group of Ponds at a Site, e.g. Fish Tank 3 or Hatchery: how Operators find a Pond and walk a Round. Not a name
+in the WorldFish DMS v5 (`docs/naming-alignment.md`, Q5).
+_Avoid_: facility, location, zone
+
 **Species**
 The species a Pond holds, identified by two uppercase letters (`SPECIES` in the WorldFish DMS v5),
 e.g. `ON` (_Oreochromis niloticus_).
@@ -43,8 +48,8 @@ in the WorldFish DMS v5.
 _Avoid_: enumerator, author, creator
 
 **Who & where**
-The signed-in Operator and the Pond chosen on a device before recording; every Record
-made there carries both. They share the top panel ("Who, where & when") with Recorded-at.
+The signed-in Operator and the Pond being recorded: chosen in the top panel ("Who, where & when", with Recorded-at), or
+in a Round the one it has reached. Every Record made there carries both.
 _Avoid_: context, session
 
 ## Records
@@ -62,6 +67,12 @@ _Avoid_: record type, form, tab
 Dissolved oxygen and temperature (required) plus optional pH, ammonia, nitrite and
 nitrate, taken in a Period.
 _Avoid_: WQ entry, measurement
+
+**Round**
+An Operator's walk through an Area's Ponds in one Period, taking a Water-quality reading at each. Each filled row is its
+own Record, saved on Next; a Pond left empty makes none. The Round itself isn't stored: its progress is kept on the
+device, only to show how far the Operator got.
+_Avoid_: session, batch, shift
 
 **Period**
 The time of day a Water-quality reading belongs to: morning or afternoon. Set from the
@@ -90,10 +101,18 @@ The weight (total weight, `WT` in the DMS), standard length (`LEN_ST`) or both o
 fish within a Sampling event.
 _Avoid_: fish row, specimen
 
+**Correction**
+A Water-quality reading that replaces an earlier one of the same Pond: made by retyping the Pond in the Round that has
+its reading. It keeps that reading's Recorded-at, as the same observation. The replaced reading stays stored but isn't
+shown in the download or the data link.
+_Avoid_: edit, amendment, overwrite
+
 **Recorded-at**
-The instant the observation was made (not when it was saved), entered in the
-Operator's local time. Set in the top panel for each Record: it starts empty and
-clears after every save, so no Record inherits an earlier one's time. Never later than now.
+The instant the observation was made (not when it was saved), in the Operator's local time. In a Round it's the moment
+of tapping Next, or with Typing from paper on, one date and time set for the readings being typed in; a Correction keeps
+the one it corrects. For the other Record
+kinds it's set in the top panel for each Record: it starts empty and clears after every save, so no Record inherits an
+earlier one's time. Never later than now.
 _Avoid_: timestamp, created at, date
 
 **Range**
@@ -127,7 +146,7 @@ _Avoid_: report, sync
 
 **Data link**
 A secret key that lets a spreadsheet (Excel Power Query, Google Sheets) read CSV files of every Record at the
-Operator's Sites, current each time it's read. One per sign-in account; making a new one stops the old one.
+Operator's Sites (a corrected reading only as its Correction), current each time it's read. One per sign-in account; making a new one stops the old one.
 _Avoid_: API key, token, share link
 
 **Provisional name**

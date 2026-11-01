@@ -44,7 +44,9 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 - **`operators`** — the people who record, with the email each signs in with and the `sites`
   (one or more codes) whose ponds they see and record. The signed-in operator's name is attached
   to each record as its `person`.
-- **`wq_readings`, `feeding_events`, `mortality_events`** — flat event tables.
+- **`wq_readings`, `feeding_events`, `mortality_events`** — flat event tables. A water-quality Correction names
+  the reading of its pond it replaces in `replaces` (no foreign key: that reading may reach the server later, or be
+  refused); `export_wq` leaves replaced readings out.
 - **`app_version`** on every record table (fish measurements inherit it from their sampling
   event): the app version that saved it, set on the server by record intake, or `legacy` for the
   imported Excel log. Use it to trace records to the code and rules that accepted them.
@@ -169,6 +171,35 @@ Until the drawer has been seen, it also holds back Chrome's own install bar. iPh
 steps end with signing in from the home screen, as that app doesn't share Safari's
 storage: for the same reason the drawer warns about Records waiting in the Outbox.
 
+### Water-quality rounds
+
+The Water tab is a Round (`components/collection/water-round.tsx`), built on the Penang operators' feedback of
+2026-10-31: almost 245 Ponds a round, at least six taps per Pond with one form per Record. An Area is picked once.
+A bar with the Pond reached, its two required readings and Next sits over a list of the Area's Ponds. The inputs stay
+the same elements from Pond to Pond, so the keyboard stays up. Next never moves under the thumb: the page scrolls to
+bring the bar to the top only on a tap into it or on a row, and once it's there the list scrolls under it.
+
+There's no new write path and no schema change: the bar is one record form (`useRecordForm`) on the Pond reached, so
+each Pond has its Draft, and each Next puts one Record in the Outbox. Next never waits for the network. A Pond left
+blank makes no Record. Retyping a Pond that has a reading in this Round makes a Correction: a new Record that names
+the reading it replaces (its mark's id) and keeps its Recorded-at, so it lands in the same cell even past noon. The
+export leaves the replaced one out, whatever order the two arrive in. The Outbox sends oldest first anyway.
+
+What keeps a reading on its Pond: on a Pond nothing was typed at, Next works only after it has shown for a second
+(a double tap must not skip a Pond). A Draft that wasn't typed while this Round was on screen (another day, a reload,
+another Operator) needs a second Next. A row tap waits while a save is in progress. The other tabs follow the Pond the
+Round reached. The time set with Typing from paper clears after 30 minutes away from the app, as a phone mostly
+sleeps rather than reloads.
+
+`lib/round.ts` keeps how far the Round got on the device, per day and Period (today's and yesterday's only, so it can't
+fill the storage the Outbox needs). These marks are only for showing: nothing about saving depends on them,
+and two Operators on one Round don't see each other's. A Round stays the same one while readings keep coming (30
+minutes apart at most), so its marks don't vanish if it runs past noon. The Period itself still follows each reading's
+hour, as everywhere else, so readings after noon are afternoon ones. That's still to be confirmed with the Operators
+(when does a round run?); if rounds do run past noon, it's `periodAt` and the `PERIOD` of `export_wq`.
+
+Tested in a desktop browser at phone size, not yet on a real iPhone: there, check that the keyboard stays up on Next.
+
 ### Saving without signal (the Outbox)
 
 Save never needs signal. It gives the Record and each of its Fish measurements an id
@@ -208,7 +239,9 @@ Build files from old deploys stay on the device until `CACHE` in `sw.js` is bump
 ## Seeing the data
 
 The database is the only source of truth. Nothing pushes rows into a shared file: every file people get is a
-copy, and corrections are to be made in the app (not built yet). Two ways in, both under "Your data" at the bottom
+copy, and corrections are made in the app: for water quality, a Correction in the Round (other Record kinds not yet).
+`export_wq` shows a corrected reading only as its Correction, and only one of the same pond can replace it, so a
+forged `replaces` can't hide another site's reading. Two ways in, both under "Your data" at the bottom
 of the app, shown from tablet width up (`md`): nobody works with the data on a phone, so a leaked data link is
 stopped from a tablet or computer too.
 
@@ -236,7 +269,7 @@ layout (tanks down, including tanks without readings; days across in 7-column bl
 frozen at B4; out-of-range cells red; a day with several readings shows the latest in yellow, or red, with a
 comment, also where the latest has no value but an earlier one does);
 Tank averages (AM/PM for oxygen and temperature); Daily averages (per area per day, chart-ready). Averages leave
-out-of-range values out. Area tabs follow Penang's old log order (`AREA_ORDER` in `lib/workbook.ts`); other areas
+out-of-range values out. Area tabs follow Penang's old log order (`AREA_ORDER` in `lib/options.ts`); other areas
 come after, alphabetically. It follows the agreed sample (`../PondCube PEN 2025-07 sample.xlsx`, made from the July
 2025 log), apart from the About wording and averages that are now unrounded (shown to two decimals). `npm run check`
 builds a file from a few test readings and checks key cells against them; when the sample is there, it also
@@ -320,6 +353,10 @@ anyone who can open the sheet can read the data.
 
 ## Roadmap / open decisions
 
+- **Different ways of working per Site**: Operators work differently in each place, so the app will need per-Site
+  front-end settings. Not built: design them from two real cases, when a second Site's way of working is known. The
+  Site's row in Airtable is their natural home. Penang's choices today: the Round as the Water tab
+  (`components/collection/water-round.tsx`) and the Area order (`lib/options.ts`).
 - **Mandible sensor data** lands in the same Neon database in its own table(s).
   Manual and sensor data meet on `pond_code` + timestamp — keep that join in mind
   for any schema change.
@@ -383,4 +420,12 @@ npm run dev         # http://localhost:3000
    psql "$DATABASE_URL_PROD" -f scripts/migrate-0.10.0.sql   # sets PEN to Asia/Kuala_Lumpur
    DATABASE_URL="$DATABASE_URL_PROD" npx drizzle-kit push
    npm run db:sync -- --prod   # from now on the zone comes from Airtable's sites.timezone
+   ```
+6. From 0.10.0 to 0.11.0 (rounds): before deploying the app, drop `export_wq` (push skips a changed view) and push,
+   which adds `wq_readings.replaces` and recreates the view. 0.10.0 keeps working on the new schema; 0.11.0 needs
+   it, as intake writes `replaces`. The download and data links fail for the seconds between the two commands. Do
+   the same on the dev branch with `DATABASE_URL`.
+   ```bash
+   psql "$DATABASE_URL_PROD" -c 'DROP VIEW IF EXISTS export_wq'
+   DATABASE_URL="$DATABASE_URL_PROD" npx drizzle-kit push
    ```

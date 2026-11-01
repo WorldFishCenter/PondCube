@@ -1,6 +1,6 @@
 import writeXlsxFile, { type Cell, type CellObject, type Row as SheetRow } from "write-excel-file/node";
 import { columnsOf, type Row } from "./export";
-import { PERIODS } from "./options";
+import { byArea, PERIODS } from "./options";
 import { PROVISIONAL as P } from "./schema";
 import { RANGES } from "./validation";
 
@@ -12,17 +12,6 @@ type Param = (typeof P)["dissolved_oxygen" | "temperature" | "ph" | "ammonia" | 
 type Column = Exclude<keyof Reading, "site">;
 type Note = { row: number; col: number; text: string }; // a cell comment
 
-// ponytail: the old Penang log's area order; other areas follow alphabetically. Put an order in Airtable when another site has areas.
-const AREA_ORDER = [
-  "Hatchery",
-  "Fish Tank 1",
-  "Fish Tank 2",
-  "Fish Tank 3",
-  "Block L",
-  "Water Storage",
-  "Aqua",
-  "Pond",
-];
 // Each reading: area tab label, About name and unit, number format, Range, Readings width.
 const PARAMS: Record<
   Param,
@@ -102,8 +91,6 @@ const groupBy = (rs: Reading[], key: (r: Reading) => string) => {
 };
 const utcDay = (yyyymmdd: string) =>
   new Date(Date.UTC(+yyyymmdd.slice(0, 4), +yyyymmdd.slice(4, 6) - 1, +yyyymmdd.slice(6, 8)));
-const rank = (area: string) => (AREA_ORDER.includes(area) ? AREA_ORDER.indexOf(area) : AREA_ORDER.length);
-const byArea = (a: string, b: string) => rank(a) - rank(b) || a.localeCompare(b);
 const column = (i: number): string =>
   (i >= 26 ? column(Math.floor(i / 26) - 1) : "") + String.fromCharCode(65 + (i % 26));
 

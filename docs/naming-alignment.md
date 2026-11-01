@@ -474,7 +474,8 @@ Each question has our proposal so a yes is enough.
    other areas in free hundreds (section 3, item 1)._ Zero-padded to three digits (`PEN_091`) or not (`PEN_91`)? Given the one-name
    rule, will Operators call Hatchery tank 1 "301" on site, with new labels on the tanks? **Deferred: dealt with last.**
 5. Can the area (Fish Tank 3, Hatchery, …) stay as a grouping in the pond picker and as an extra pond field, or does
-   it go? It is how Penang Operators find a tank among 296.
+   it go? It is how Penang Operators find a tank among 296, and since app version 0.11.0 how they walk a Round on the
+   Water tab, so a "no" needs another way to walk the ponds.
 6. Pond area: hectares (DMS) or decimals (pond book)? **Answered: hectares.**
 
 **Species**

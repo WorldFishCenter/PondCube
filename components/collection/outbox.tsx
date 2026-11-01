@@ -98,6 +98,8 @@ const WHY_NOT_SENT: Record<Stopped, string> = {
 export function OutboxAlert({ outbox, className }: { outbox: Outbox; className?: string }) {
   const { mine, others, sending, stopped, flush } = outbox;
   if (!mine.length && !others.length) return null;
+  // Going through normally: nothing to say, and appearing for each Record would shift the screen under the Operator.
+  if (sending && !stopped && !others.length && !mine.some((w) => w.problem)) return null;
 
   return (
     // Wider action slot than the stock pr-18, so "Send now" fits at the 44px touch size.

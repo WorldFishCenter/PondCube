@@ -1,5 +1,6 @@
-import { eq, sql, type Column, type SQL } from "drizzle-orm";
+import { and, eq, notExists, sql, type Column, type SQL } from "drizzle-orm";
 import {
+  alias,
   pgTable,
   pgView,
   text,
@@ -95,10 +96,12 @@ export const wqReadings = pgTable("wq_readings", {
   nitrite: doublePrecision("nitrite"),
   nitrate: doublePrecision("nitrate"),
   remarks: text("remarks"),
+  replaces: uuid("replaces"), // a correction: the reading of its pond it replaces (no FK: that may arrive later)
   person: text("person").notNull(),
   appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+const correction = alias(wqReadings, "correction");
 
 // ---- Event: feeding ----
 export const feedingEvents = pgTable("feeding_events", {
@@ -253,6 +256,15 @@ export const wqView = pgView("export_wq").as((qb) =>
       .from(wqReadings)
       .$dynamic(),
     wqReadings.pondCode,
+  ).where(
+    // A corrected reading isn't shown, its correction is. Only within its pond, so never another site's.
+    // ponytail: no index on replaces, so each read scans the table twice; add a partial one past ~100k rows.
+    notExists(
+      qb
+        .select({ id: correction.id })
+        .from(correction)
+        .where(and(eq(correction.replaces, wqReadings.id), eq(correction.pondCode, wqReadings.pondCode))),
+    ),
   ),
 );
 

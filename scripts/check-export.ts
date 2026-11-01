@@ -2,6 +2,7 @@
 // site-local DATE and TIME, rows only ever from the Operator's own sites, and data links. Run: npm run check
 import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
+import { gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import * as schema from "../lib/schema";
@@ -66,6 +67,38 @@ async function main() {
   assert.equal(tal.period, "afternoon", "the Period is the site's too, whatever the device sent");
   const legacy = await readRows(db, "wq", ["PEN"], { date: "202507" });
   assert.deepEqual([legacy.length, legacy[0].source, legacy[0].time], [1, "legacy", "08:00"]);
+
+  // A corrected reading isn't shown, only its correction (so the download and its averages use that); the stored
+  // reading stays. A correction can only replace a reading of its own pond: none of another site's.
+  const [typo, other] = await db
+    .insert(schema.wqReadings)
+    .values(
+      ["PEN-FT1-001", "TAL-PND-007"].map((pondCode) => ({
+        pondCode,
+        recordedAt: new Date("2026-11-02T01:00:00Z"),
+        period: "morning",
+        dissolvedOxygen: 15.2,
+        person: "Ana",
+        appVersion: "0.11.0",
+      })),
+    )
+    .returning();
+  await db.insert(schema.wqReadings).values(
+    [typo.id, other.id].map((replaces) => ({
+      pondCode: "PEN-FT1-001",
+      recordedAt: typo.recordedAt,
+      period: "morning",
+      dissolvedOxygen: 5.2,
+      replaces,
+      person: "Ana",
+      appVersion: "0.11.0",
+    })),
+  );
+  const shown = async (site: string) =>
+    (await readRows(db, "wq", [site], { date: "202611" })).map((r) => r.dissolved_oxygen);
+  assert.deepEqual(await shown("PEN"), [5.2, 5.2], "the typo is replaced by its correction");
+  assert.deepEqual(await shown("TAL"), [15.2], "a correction at PEN hides nothing at TAL");
+  await db.delete(schema.wqReadings).where(gte(schema.wqReadings.recordedAt, typo.recordedAt));
 
   // An Operator of PEN gets nothing from TAL, from any view, even when asking for it by name.
   for (const name of Object.keys(VIEWS) as (keyof typeof VIEWS)[]) {

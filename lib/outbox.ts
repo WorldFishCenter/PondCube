@@ -11,6 +11,7 @@ export type WaitingRecord = {
   person: string;
   record: { id: string; pondCode: string; [field: string]: unknown };
   problem?: string;
+  savedAt?: number; // the sending order; absent before 0.11.0
 };
 /** How one send went. "offline": no reply, so stop and try later; failed: the server refused this one. */
 export type Sent = "saved" | Stopped | { failed: string };
@@ -26,11 +27,12 @@ const withNewNamesWaiting = ({ enumerator, ...w }: WaitingRecord & { enumerator?
   record: withNewNames(w.kind, w.record) as WaitingRecord["record"],
 });
 
-/** Every Record waiting on this device, whoever saved it. */
+/** Every Record waiting on this device, whoever saved it, oldest first: a correction never overtakes its reading. */
 export const waitingRecords = (storage: KeyValueStorage = browserStorage): WaitingRecord[] =>
   attempt(() => storage.keys(), [])
     .filter((key) => key.startsWith(PREFIX))
-    .flatMap((key) => attempt(() => [withNewNamesWaiting(JSON.parse(storage.getItem(key) ?? ""))], []));
+    .flatMap((key) => attempt(() => [withNewNamesWaiting(JSON.parse(storage.getItem(key) ?? ""))], []))
+    .sort((a, b) => (a.savedAt ?? 0) - (b.savedAt ?? 0));
 
 /** `send` posts one Record: to app/api/records in the app, to a fake in scripts/check-outbox.ts. */
 export function createOutbox(
@@ -38,6 +40,7 @@ export function createOutbox(
   storage: KeyValueStorage = browserStorage,
 ) {
   let inFlight: Promise<Stopped | undefined> | undefined;
+  let lastSaved = 0; // two Records saved in the same millisecond still keep their order
 
   const all = () => waitingRecords(storage);
   const put = (waiting: WaitingRecord) => writeLocal(PREFIX + waiting.record.id, JSON.stringify(waiting), storage);
@@ -59,7 +62,9 @@ export function createOutbox(
   return {
     all,
     /** True once the Record is safe: in the Outbox or, when storage refuses it, sent there and then. */
-    add: async (waiting: WaitingRecord) => put(waiting) || (await send(waiting)) === "saved",
+    add: async (waiting: WaitingRecord) =>
+      put({ ...waiting, savedAt: (lastSaved = Math.max(Date.now(), lastSaved + 1)) }) ||
+      (await send(waiting)) === "saved",
     /** Sends this account's waiting Records one at a time. A call while one runs joins it. */
     flush: (account: string) => (inFlight ??= sendAll(account).finally(() => (inFlight = undefined))),
   };

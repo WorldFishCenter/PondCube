@@ -4,6 +4,21 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.11.0] - 2026-11-01
+
+### Changed
+
+- Water readings are now taken in rounds, as the operators asked. Pick an area once and its ponds are listed with dissolved oxygen and temperature side by side. Type the two readings and tap Next: the app saves them and moves to the next pond, about two taps per pond instead of six. A pond left empty is skipped, and no reading is made for it.
+- Next stays in the same place under your thumb. The entry bar moves to the top of the screen when you tap into it or tap a pond, and the list then follows it.
+- On a pond where nothing has been typed, Next works only once the pond has been on screen for a second, so a double tap can't skip a pond.
+- Each reading takes the time you tap Next, so there's no date to set. To type in readings written down on paper, turn on Typing from paper and set when you took them. After more than half an hour away from the app, it asks for that date and time again.
+- The app shows how far you got in the round, even after closing it, and starts a new round on its own in the afternoon and the next day. It keeps saving with no signal, as before.
+- pH, ammonia, nitrate, nitrite and remarks are under More readings, on the pond that needs them. They close again on the next pond.
+- A reading typed earlier and never saved (on another day, or by someone else on this phone) shows on its pond, but it's saved only if you tap Next a second time or type over it.
+- To correct a reading during the round, tap its pond and type the new values. They replace the old ones in the download, its averages and the data link, at the time of the reading they correct, even if you correct it after noon. The old values are kept in the database.
+- The pond list on the Feeding, Mortality and Sampling tabs is grouped by area, and those tabs open on the pond the round has reached.
+- The notice about records waiting to send no longer appears while a record is sending normally, so the screen doesn't jump.
+
 ## [0.10.0] - 2026-10-30
 
 ### Added

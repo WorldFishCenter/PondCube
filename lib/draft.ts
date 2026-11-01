@@ -6,6 +6,13 @@ import { isFuture, recordedAtLocal, withNewNames } from "./validation";
 /** One draft per record type and pond: switching ponds never carries an entry to the wrong pond. */
 export const draftKey = (kind: string, pondCode: string) => `pondcube:draft:${kind}:${pondCode}`;
 
+/** The Draft of a record type and pond, or null. Saved before 0.8.0, it comes back under the new field names. */
+export const readDraft = (kind: string, pondCode: string, storage: KeyValueStorage = browserStorage) =>
+  attempt(() => {
+    const raw = storage.getItem(draftKey(kind, pondCode));
+    return raw ? withNewNames(kind, JSON.parse(raw)) : null;
+  }, null);
+
 /** What a submit led to. Only "kept" (the Record is in the Outbox or on the server) clears the Draft. */
 export type Submitted = "kept" | "notKept" | "noRecordedAt" | "futureRecordedAt";
 
@@ -19,12 +26,7 @@ export function createDraft<T, R extends object = object>(
   const key = draftKey(kind, pondCode);
   let muted = false;
   return {
-    /** Saved before 0.8.0, it comes back under the new field names. */
-    restore: (): Partial<T> | null =>
-      attempt(() => {
-        const raw = storage.getItem(key);
-        return raw ? (withNewNames(kind, JSON.parse(raw)) as Partial<T>) : null;
-      }, null),
+    restore: () => readDraft(kind, pondCode, storage) as Partial<T> | null,
     change: (values: unknown) => {
       if (!muted) writeLocal(key, JSON.stringify(values), storage);
     },

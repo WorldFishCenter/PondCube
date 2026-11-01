@@ -11,15 +11,7 @@ import type { RECORD_KINDS, RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -31,8 +23,8 @@ import type { Outbox } from "./outbox";
 type Result = { ok: boolean; title: string; msg: string } | null;
 type Message = { message?: string } | undefined;
 
-/** Recorded-at, held by the app shell for every record kind: local "YYYY-MM-DDTHH:mm", "" until set. */
-export type RecordedAt = { value: string; clear: () => void };
+/** Recorded-at: local "YYYY-MM-DDTHH:mm", "" until set. `clear` runs after a save, where each Record sets its own. */
+export type RecordedAt = { value: string; clear?: () => void };
 /** What every record form gets from the app shell. */
 export type RecordFormProps = { pondCode: string; recordedAt: RecordedAt; outbox: Outbox };
 
@@ -53,11 +45,13 @@ export function useRecordForm<K extends RecordKind, TValues extends FieldValues,
   pondCode,
   recordedAt,
   outbox,
+  onSaved,
 }: RecordFormProps & {
   kind: K;
   schema: z.ZodType<TRecord, TValues> & (typeof RECORD_KINDS)[K]["form"]; // must be this kind's form schema
   blank: (last?: TRecord) => TValues; // empty number fields are "": reset() with undefined leaves inputs filled
   savedMessage: (record: TRecord) => string;
+  onSaved?: (record: TRecord) => void;
 }) {
   const [submitted, setSubmitted] = React.useState<Submission>(null);
   const form = useForm<TValues, unknown, TRecord>({
@@ -88,12 +82,14 @@ export function useRecordForm<K extends RecordKind, TValues extends FieldValues,
       return;
     }
     draft.muted(() => reset(blank(record)));
-    recordedAt.clear();
+    recordedAt.clear?.();
     setSubmitted({ id: record.id, msg: savedMessage(record) });
+    onSaved?.(record);
   });
+  const clearResult = React.useCallback(() => setSubmitted(null), []);
 
   const result = resultOf(submitted, outbox);
-  return { form, card: { onSubmit, result, pending: formState.isSubmitting } };
+  return { form, card: { onSubmit, result, pending: formState.isSubmitting }, clearResult };
 }
 
 // The form's message follows the Record until the server has it.
@@ -105,6 +101,16 @@ function resultOf(submitted: Submission, { isWaiting, sending }: Outbox): Result
   return { ok: true, title: "Saved on this device", msg: `${submitted.msg} ${next}` };
 }
 
+export function ResultAlert({ result }: { result: NonNullable<Result> }) {
+  return (
+    <Alert variant={result.ok ? "default" : "destructive"}>
+      {result.ok ? <CheckCircle2 /> : <AlertCircle />}
+      <AlertTitle>{result.title}</AlertTitle>
+      <AlertDescription>{result.msg}</AlertDescription>
+    </Alert>
+  );
+}
+
 export function RecordCard({
   id,
   title,
@@ -113,14 +119,12 @@ export function RecordCard({
   onSubmit,
   result,
   pending,
-  action,
   children,
 }: {
   id: string;
   title: string;
   description: string;
   saveLabel: string;
-  action?: React.ReactNode; // beside the title, e.g. a value set from elsewhere
   onSubmit: React.FormEventHandler<HTMLFormElement>;
   result: Result;
   pending: boolean;
@@ -131,7 +135,6 @@ export function RecordCard({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
-        {action && <CardAction>{action}</CardAction>}
       </CardHeader>
       <CardContent>
         {/* noValidate: zod shows every error in the same place instead of native browser bubbles. */}
@@ -143,13 +146,7 @@ export function RecordCard({
         </form>
       </CardContent>
       <CardFooter className="flex-col gap-4">
-        {result ? (
-          <Alert variant={result.ok ? "default" : "destructive"}>
-            {result.ok ? <CheckCircle2 /> : <AlertCircle />}
-            <AlertTitle>{result.title}</AlertTitle>
-            <AlertDescription>{result.msg}</AlertDescription>
-          </Alert>
-        ) : null}
+        {result ? <ResultAlert result={result} /> : null}
         <Button type="submit" form={id} className="w-full" disabled={pending}>
           {pending && <Spinner data-icon="inline-start" />}
           {saveLabel}

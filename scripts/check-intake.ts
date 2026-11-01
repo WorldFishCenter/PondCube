@@ -90,6 +90,15 @@ async function main() {
   assert.equal(await rows(schema.wqReadings), 1);
   assert.equal(await rows(schema.mortalityEvents), 1);
 
+  // A correction names the reading it replaces; blank is no correction, anything but an id is refused.
+  const reading = { ...who, recordedAt, period: "morning", temperature: "28.4" };
+  await save("wq", { ...reading, dissolvedOxygen: "5.2", replaces: wq.id });
+  await save("wq", { ...reading, dissolvedOxygen: "5.3", replaces: "" });
+  await assert.rejects(save("wq", { ...reading, dissolvedOxygen: "5.4", replaces: "pond 1's" }));
+  const links = await db.select({ replaces: schema.wqReadings.replaces }).from(schema.wqReadings);
+  assert.deepEqual(links.map((r) => r.replaces).filter(Boolean), [wq.id]);
+  assert.equal(links.length, 3);
+
   // Unknown pond: the foreign key rejects it.
   await assert.rejects(save("mortality", { ...who, pondCode: "PEN-NOPE-999", recordedAt, mortalityCount: "1" }));
 

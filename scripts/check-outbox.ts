@@ -53,7 +53,8 @@ async function main() {
   reply = (w) => (w.record.id === bad.record.id ? { failed: "Dissolved oxygen: expected 0–20" } : "saved");
   assert.equal(await box.flush("user_ana"), undefined);
   const reloaded = createOutbox(net.send, store);
-  assert.deepEqual(reloaded.all(), [{ ...bad, problem: "Dissolved oxygen: expected 0–20" }]);
+  const [kept] = reloaded.all();
+  assert.deepEqual(reloaded.all(), [{ ...bad, problem: "Dissolved oxygen: expected 0–20", savedAt: kept.savedAt }]);
   reply = () => "saved";
   await reloaded.flush("user_ana");
   assert.deepEqual(reloaded.all(), [], "once accepted, it's gone");
@@ -73,6 +74,19 @@ async function main() {
   await one;
   assert.deepEqual(slow.sent.sort(), ids([first, late]), "each sent once, the late one included");
   assert.deepEqual(joined.all(), []);
+
+  // Sent in the order saved, whatever order storage lists its keys in (a browser's isn't the saved one).
+  const listed = memory();
+  const inOrder = fakeSend(() => "saved");
+  const ordered = createOutbox(inOrder.send, { ...listed, keys: () => listed.keys().reverse() });
+  const three = [saved(), saved(), saved()];
+  for (const w of three) await ordered.add(w);
+  await ordered.flush("user_ana");
+  assert.deepEqual(
+    inOrder.sent,
+    three.map((w) => w.record.id),
+    "an offline correction arrives after the reading it corrects",
+  );
 
   // The record survives storage as JSON: Recorded-at goes out as an instant the server accepts.
   const at = new Date("2026-10-09T00:00:00.000Z");

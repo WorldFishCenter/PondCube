@@ -1,17 +1,22 @@
 "use client";
 
+import * as React from "react";
+import { areasOf } from "@/lib/round";
 import {
   Combobox,
+  ComboboxCollection,
   ComboboxContent,
   ComboboxEmpty,
+  ComboboxGroup,
   ComboboxInput,
   ComboboxItem,
+  ComboboxLabel,
   ComboboxList,
 } from "@/components/ui/combobox";
 
-export type Pond = { pondCode: string; displayName: string; site: string };
+export type Pond = { pondCode: string; displayName: string; site: string; area: string };
 
-// Typing filters on "code · name", so both "FT3-091" and "Fish Tank 3" find a pond.
+// Grouped by Area. Typing filters on "code · name", so both "FT3-091" and "Fish Tank 3" find a pond.
 export function PondCombobox({
   id,
   ponds,
@@ -23,9 +28,10 @@ export function PondCombobox({
   value: string;
   onChange: (code: string) => void;
 }) {
+  const areas = React.useMemo(() => areasOf(ponds), [ponds]);
   return (
     <Combobox
-      items={ponds}
+      items={areas}
       value={ponds.find((p) => p.pondCode === value) ?? null}
       onValueChange={(p) => onChange(p?.pondCode ?? "")}
       itemToStringLabel={(p) => `${p.pondCode} · ${p.displayName}`}
@@ -35,11 +41,18 @@ export function PondCombobox({
       <ComboboxContent>
         <ComboboxEmpty>No pond found.</ComboboxEmpty>
         <ComboboxList>
-          {(p: Pond) => (
-            <ComboboxItem key={p.pondCode} value={p}>
-              <span className="font-mono">{p.pondCode}</span>
-              <span className="truncate text-muted-foreground">{p.displayName}</span>
-            </ComboboxItem>
+          {(area: (typeof areas)[number]) => (
+            <ComboboxGroup key={area.value} items={area.items}>
+              <ComboboxLabel>{area.label}</ComboboxLabel>
+              <ComboboxCollection>
+                {(p: Pond) => (
+                  <ComboboxItem key={p.pondCode} value={p}>
+                    <span className="font-mono">{p.pondCode}</span>
+                    <span className="truncate text-muted-foreground">{p.displayName}</span>
+                  </ComboboxItem>
+                )}
+              </ComboboxCollection>
+            </ComboboxGroup>
           )}
         </ComboboxList>
       </ComboboxContent>

@@ -19,7 +19,7 @@ export async function getPonds(sites: string[]) {
   "use cache";
   cacheLife("minutes");
   return db
-    .select({ pondCode: pond.pondCode, displayName: pond.displayName, site: pond.site })
+    .select({ pondCode: pond.pondCode, displayName: pond.displayName, site: pond.site, area: pond.area })
     .from(pond)
     .where(and(eq(pond.status, "active"), inArray(pond.site, sites)))
     .orderBy(asc(pond.pondCode));

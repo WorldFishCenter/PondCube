@@ -7,9 +7,10 @@ import { readLocal, writeLocal } from "@/lib/storage";
 import type { RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PondCubeLogo } from "@/components/pondcube-logo";
@@ -19,22 +20,23 @@ import { FeedbackSheet } from "./feedback-sheet";
 import { OutboxAlert, useOutbox } from "./outbox";
 import { PondCombobox, type Pond } from "./pond-combobox";
 import { RecordedAtField, type RecordFormProps } from "./record-form";
-import { WaterQualityForm } from "./water-quality-form";
+import { WaterRound } from "./water-round";
 import { FeedingForm, type Feed } from "./feeding-form";
 import { MortalityForm } from "./mortality-form";
 import { SamplingForm } from "./sampling-form";
 
 const POND_KEY = "pondcube:lastPond";
 const RECORDED_AT_KEY = "pondcube:recordedAt"; // kept so a refresh mid-record doesn't lose it
+const AWAY = 30 * 60_000; // ms away from the app after which Past readings' time is cleared
 
 // One tab per Record kind (lib/validation.ts RECORD_KINDS; the compiler flags a missing one), in tab
-// order. Each form owns its fields and its kind's draft; only the Feeding form uses `feeds`.
+// order. Each form owns its fields and its kind's draft; only the Feeding form uses `feeds`. Water is a Round: no Form.
 const TABS = {
-  wq: { label: "Water", Form: WaterQualityForm },
+  wq: { label: "Water" },
   feeding: { label: "Feeding", Form: FeedingForm },
   mortality: { label: "Mortality", Form: MortalityForm },
   sampling: { label: "Sampling", Form: SamplingForm },
-} satisfies Record<RecordKind, { label: string; Form: React.ComponentType<RecordFormProps & { feeds: Feed[] }> }>;
+} satisfies Record<RecordKind, { label: string; Form?: React.ComponentType<RecordFormProps & { feeds: Feed[] }> }>;
 
 // The selected record kind is filled with the primary colour. Stock Tabs has no filled variant,
 // so this is shadcn's className step with semantic tokens; the dark: ones beat the stock dark style.
@@ -96,7 +98,19 @@ export function CollectionApp({
   const feedsHere = feeds.filter((f) => site && f.sites.includes(site)); // the chosen pond's site's feeds
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);
+  const [kind, setKind] = React.useState<RecordKind>("wq");
+  // A Round's Past readings: null is off; "" is on with no time, so a later Round can't inherit an old one.
+  const [past, setPast] = React.useState<string | null>(null);
   const outbox = useOutbox(account, person);
+  React.useEffect(() => {
+    let hiddenAt = Infinity;
+    const onVisibility = () => {
+      if (document.hidden) hiddenAt = Date.now();
+      else if (Date.now() - hiddenAt > AWAY) setPast((p) => (p === null ? p : ""));
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
 
   // Restore after hydration (server has no localStorage), so setState-in-effect is intended.
   React.useEffect(() => {
@@ -106,10 +120,10 @@ export function CollectionApp({
     setRestored(true);
   }, []);
   useKeepForOffline(); // the page that opens with no signal is this one, signed in
-  const choosePond = (code: string) => {
+  const choosePond = React.useCallback((code: string) => {
     setPondCode(code);
     writeLocal(POND_KEY, code);
-  };
+  }, []);
   // Empty until the operator sets it; a successful save clears it, so each record gets its own.
   const chooseRecordedAt = (value: string) => {
     setRecordedAt(value);
@@ -123,8 +137,10 @@ export function CollectionApp({
         <CardHeader>
           <CardTitle>Who, where &amp; when</CardTitle>
           <CardDescription>
-            You&apos;re recording as the signed-in operator. The pond is remembered on this device. Set the date &amp;
-            time for each record.
+            You&apos;re recording as the signed-in operator.{" "}
+            {kind === "wq"
+              ? "Each reading takes the time you tap Next."
+              : "The pond is remembered on this device. Set the date & time for each record."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -133,13 +149,39 @@ export function CollectionApp({
               <FieldLabel htmlFor="operator">Person</FieldLabel>
               <Input id="operator" value={person} readOnly />
             </Field>
-            <Field>
-              <FieldLabel htmlFor="pond">Pond</FieldLabel>
-              <PondCombobox id="pond" ponds={ponds} value={pondCode} onChange={choosePond} />
-            </Field>
-            <div className="md:col-span-2">
-              <RecordedAtField id="recorded-at" value={recordedAt} onChange={chooseRecordedAt} />
-            </div>
+            {kind === "wq" ? (
+              <>
+                <Field orientation="horizontal">
+                  <FieldContent>
+                    <FieldLabel htmlFor="past-readings">Typing from paper</FieldLabel>
+                    <FieldDescription>
+                      Turn on to type in readings you wrote down earlier. Set when you took them, and every reading gets
+                      that time.
+                    </FieldDescription>
+                  </FieldContent>
+                  <Switch
+                    id="past-readings"
+                    checked={past !== null}
+                    onCheckedChange={(on) => setPast(on ? "" : null)}
+                  />
+                </Field>
+                {past !== null && (
+                  <div className="md:col-span-2">
+                    <RecordedAtField id="past-at" value={past} onChange={setPast} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="pond">Pond</FieldLabel>
+                  <PondCombobox id="pond" ponds={ponds} value={pondCode} onChange={choosePond} />
+                </Field>
+                <div className="md:col-span-2">
+                  <RecordedAtField id="recorded-at" value={recordedAt} onChange={chooseRecordedAt} />
+                </div>
+              </>
+            )}
             <OutboxAlert outbox={outbox} className="md:col-span-2" />
           </FieldGroup>
         </CardContent>
@@ -150,25 +192,29 @@ export function CollectionApp({
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-96 w-full rounded-xl" />
         </>
-      ) : !pondCode ? (
-        <Alert>
-          <Info />
-          <AlertTitle>Pick a pond</AlertTitle>
-          <AlertDescription>Choose a pond above to start recording.</AlertDescription>
-        </Alert>
       ) : (
-        <Tabs defaultValue={Object.keys(TABS)[0]}>
+        <Tabs value={kind} onValueChange={setKind}>
           <TabsList className="w-full">
-            {Object.entries(TABS).map(([kind, { label }]) => (
-              <TabsTrigger key={kind} value={kind} className={FILLED_TAB}>
+            {Object.entries(TABS).map(([value, { label }]) => (
+              <TabsTrigger key={value} value={value} className={FILLED_TAB}>
                 {label}
               </TabsTrigger>
             ))}
           </TabsList>
-          {Object.entries(TABS).map(([kind, { Form }]) => (
-            // Keyed by pond: switching ponds remounts the form with that pond's draft.
-            <TabsContent key={kind} value={kind}>
-              <Form key={pondCode} pondCode={pondCode} recordedAt={when} outbox={outbox} feeds={feedsHere} />
+          {Object.entries(TABS).map(([value, tab]) => (
+            <TabsContent key={value} value={value}>
+              {!("Form" in tab) ? (
+                <WaterRound ponds={ponds} past={past} outbox={outbox} onPond={choosePond} />
+              ) : pondCode ? (
+                // Keyed by pond: switching ponds remounts the form with that pond's draft.
+                <tab.Form key={pondCode} pondCode={pondCode} recordedAt={when} outbox={outbox} feeds={feedsHere} />
+              ) : (
+                <Alert>
+                  <Info />
+                  <AlertTitle>Pick a pond</AlertTitle>
+                  <AlertDescription>Choose a pond above to start recording.</AlertDescription>
+                </Alert>
+              )}
             </TabsContent>
           ))}
         </Tabs>

@@ -4,6 +4,22 @@ export const PERIODS = [
 ] as const;
 // Before noon: morning. Compared with a local "HH" or "HH:mm" text, on the device and in the export view.
 export const NOON = "12";
+/** The Period of a local "YYYY-MM-DDTHH:mm". */
+export const periodAt = (local: string) => (local.split("T")[1] < NOON ? "morning" : "afternoon");
+
+// ponytail: the old Penang log's area order; other areas follow alphabetically. Put an order in Airtable when another site has areas.
+const AREA_ORDER = [
+  "Hatchery",
+  "Fish Tank 1",
+  "Fish Tank 2",
+  "Fish Tank 3",
+  "Block L",
+  "Water Storage",
+  "Aqua",
+  "Pond",
+];
+const areaRank = (area: string) => (AREA_ORDER.includes(area) ? AREA_ORDER.indexOf(area) : AREA_ORDER.length);
+export const byArea = (a: string, b: string) => areaRank(a) - areaRank(b) || a.localeCompare(b);
 
 // WorldFish DMS v5 causes of death (CAUSE_DEATH), in its order, shown as the DMS writes them.
 export const CAUSES = [
