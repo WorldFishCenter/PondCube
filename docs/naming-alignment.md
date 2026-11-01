@@ -383,19 +383,19 @@ The bounds differ but nothing conflicts by name. Q8 asks whether program-wide Ra
 
 ### 2.9 What Operators see
 
-| Where       | App label now                                     | Pond book label                                  |
-| ----------- | ------------------------------------------------- | ------------------------------------------------ |
-| Pond picker | Pond; `Fish Tank 3 - #91`                         | POND; `TAL_01`                                   |
-| Period      | Time of day: Morning (AM), Afternoon (PM)         | MORNING, MIDDAY, AFTERNOON                       |
-| Tab         | Water quality                                     | WATER CHEMISTRY                                  |
-| Readings    | Dissolved oxygen, Temperature, pH, Ammonia (mg/L) | DISOLVED OXYGEN, TEMPERATURE, pH, AMMONIA (mg/l) |
-| Tab         | Feeding                                           | FEED                                             |
-| Feed        | Feed; Amount fed (kg); Number of feedings         | FEED TYPE; FEED WEIGHT (g)                       |
-| Tab         | Mortality                                         | FISH DEATH                                       |
-| Deaths      | Number of dead fish; Cause of death; Remarks      | COUNT_DEAD; CAUSE OF DEATH; REMARKS              |
-| Tab         | Sampling                                          | RANDOM SAMPLE                                    |
-| Sample      | Remarks; Total weight (g); Standard length (cm)   | REMARKS; MEAN WEIGHT (g); (DMS: standard length) |
-| Free text   | Remarks                                           | REMARKS                                          |
+| Where       | App label now                                   | Pond book label                                  |
+| ----------- | ----------------------------------------------- | ------------------------------------------------ |
+| Pond picker | Pond; `Fish Tank 3 - #91`                       | POND; `TAL_01`                                   |
+| Period      | Time of day: Morning (AM), Afternoon (PM)       | MORNING, MIDDAY, AFTERNOON                       |
+| Tab         | Water quality                                   | WATER CHEMISTRY                                  |
+| Readings    | Oxygen (mg/L), Temperature, pH, Ammonia (mg/L)  | DISOLVED OXYGEN, TEMPERATURE, pH, AMMONIA (mg/l) |
+| Tab         | Feeding                                         | FEED                                             |
+| Feed        | Feed; Amount fed (kg); Number of feedings       | FEED TYPE; FEED WEIGHT (g)                       |
+| Tab         | Mortality                                       | FISH DEATH                                       |
+| Deaths      | Number of dead fish; Cause of death; Remarks    | COUNT_DEAD; CAUSE OF DEATH; REMARKS              |
+| Tab         | Sampling                                        | RANDOM SAMPLE                                    |
+| Sample      | Remarks; Total weight (g); Standard length (cm) | REMARKS; MEAN WEIGHT (g); (DMS: standard length) |
+| Free text   | Remarks                                         | REMARKS                                          |
 
 ## 3. Renames needed
 

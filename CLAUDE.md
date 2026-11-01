@@ -55,7 +55,7 @@ components/install-prompt.tsx  "Install the app" link + drawer (opens itself onc
                           browser): install steps per platform; one-tap Install where the browser offers it. In app/page.tsx
 components/steps.tsx      Numbered instructions (install drawer, data sheet)
 components/sign-in-card.tsx  Clerk's sign-in, with the app's width and touch size (both sign-in routes)
-components/collection/*    App UI: shell (who/where/when panel, record kinds → tabs), not-on-list card, pond picker,
+components/collection/*    App UI: shell (Operator's name, record kinds → tabs, Pond + date above the forms), not-on-list card, pond picker,
                           water-round.tsx = the Water tab, a Round through an Area (one form on the Pond reached, rows below);
                           the 3 other forms, feedback sheet (Airtable form), data sheet ("Your data": download + data link);
                           record-form.tsx = shared form hook (draft, save) + fields + STATUS, StatusBadge, FILLED_TAB;
@@ -137,6 +137,8 @@ These favour care over speed; on trivial tasks, use judgment.
   the device for instant feedback; the save schema re-runs in `app/api/records`
   before intake. The database never receives an out-of-range value silently. Add a
   bound by editing `RANGES`/the schema, not the UI.
+- **Number fields are text with a number keypad, never `type="number"`.** Browsers read that differently per device and
+  region. `toNumber` (`lib/validation.ts`) reads what's typed, the same everywhere; a comma before three digits is refused.
 - **Record intake is all-or-nothing.** A record is stored whole or not at all — a
   Sampling event never persists without its Fish measurements. Keep new write paths
   going through `lib/intake.ts`. Every Record carries an id made on the device;

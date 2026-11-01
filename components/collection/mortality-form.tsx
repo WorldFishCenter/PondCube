@@ -22,13 +22,7 @@ export function MortalityForm(props: RecordFormProps) {
   } = form;
 
   return (
-    <RecordCard
-      id="mortality-form"
-      title="Mortality"
-      description="Record dead fish removed from the pond."
-      saveLabel="Save mortality"
-      {...card}
-    >
+    <RecordCard id="mortality-form" saveLabel="Save mortality" {...card}>
       <NumberField
         id="mo-c"
         label="Number of dead fish"

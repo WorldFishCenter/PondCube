@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { CAUSES, PERIODS } from "./options";
 
-// Inputs give "" for empty; anything else becomes a Number (NaN then fails z.number).
-const toNumber = (v: unknown) => (v === "" || v === null || v === undefined ? undefined : Number(v));
+// What's typed, read the same on every device; NaN then fails z.number. A decimal comma is a point, except before
+// three digits, where it may be thousands: "1,500" is refused, never read as 1.5.
+const toNumber = (v: unknown) => {
+  if (typeof v !== "string") return v ?? undefined;
+  const text = v.trim().replace(/,(?=\d{1,2}$)/, ".");
+  if (!text) return undefined;
+  return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(text) ? Number(text) : NaN;
+};
 
 // One source for choice values: the option lists the UI renders.
 const enumOf = <T extends readonly { value: string }[]>(options: T, error?: string) =>

@@ -30,13 +30,7 @@ export function SamplingForm(props: RecordFormProps) {
   const fishError = errors.fish?.root ?? (errors.fish?.message ? errors.fish : undefined);
 
   return (
-    <RecordCard
-      id="sampling-form"
-      title="Sampling"
-      description="Weigh and measure a sample of fish."
-      saveLabel="Save sampling"
-      {...card}
-    >
+    <RecordCard id="sampling-form" saveLabel="Save sampling" {...card}>
       <NotesField id="sa-n" placeholder="Purpose, batch, etc." {...register("notes")} />
       <FieldSet>
         <FieldLegend>Fish measurements</FieldLegend>

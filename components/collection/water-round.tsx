@@ -25,9 +25,8 @@ import { readLocal, writeLocal } from "@/lib/storage";
 import { waterQualityForm } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { noticeShown, OutboxAlert, type Outbox } from "./outbox";
@@ -48,7 +47,7 @@ const SETTLE = 1000; // ms a Pond shows before Skip works: a tap before its numb
 const COLUMNS = "grid grid-cols-[3.5rem_1fr_1fr_4.5rem] gap-2";
 
 const REQUIRED = [
-  { name: "dissolvedOxygen", label: "Dissolved oxygen (mg/L)" },
+  { name: "dissolvedOxygen", label: "Oxygen (mg/L)" }, // the short name, to stay on one line: this is read 245 times
   { name: "temperature", label: "Temperature (°C)" },
 ] as const;
 // In the order of the old log.
@@ -165,7 +164,6 @@ function AreaRound({
   const [moreFor, setMoreFor] = React.useState(""); // the Pond with More readings open: closed on the next one
   const [check, setCheck] = React.useState(""); // the Pond whose values were typed earlier: Save once more keeps them
   const [last, setLast] = React.useState(""); // the Pond saved last, for the bar's confirmation
-  const [badInput, setBadInput] = React.useState(false); // text a number input can't read: blank to the form, not empty
   const settleUntil = React.useRef(0); // performance.now(), which a change of the device clock can't stall
   const typedNow = React.useRef(new Set<string>()); // Ponds typed at since this Round opened on screen
   const saving = React.useRef(false);
@@ -205,18 +203,16 @@ function AreaRound({
     formState: { errors },
   } = form;
   // Renders only when one of these flips, not on each keystroke: 120 rows hang off this.
-  const { noValues, typedMore } = useWatch({
+  const { empty, typedMore } = useWatch({
     control,
-    compute: (v) => ({ noValues: isBlank(v), typedMore: !isBlank({ ...v, dissolvedOxygen: "", temperature: "" }) }),
+    compute: (v) => ({ empty: isBlank(v), typedMore: !isBlank({ ...v, dissolvedOxygen: "", temperature: "" }) }),
   });
-  const empty = noValues && !badInput; // only for showing: Save decides from the form itself
   const showMore = moreFor === current || typedMore; // never hides a value, or an error on one
 
   const move = React.useCallback(
     (pondCode: string) => {
       clearResult();
       setCheck("");
-      setBadInput(false);
       setCurrent(pondCode);
       if (pondCode) onPond(pondCode);
     },
@@ -227,7 +223,7 @@ function AreaRound({
     e.preventDefault();
     if (card.pending || performance.now() < settleUntil.current) return;
     setFocus("dissolvedOxygen"); // in the tap itself: iPhones keep the keyboard up only for a focus made there
-    if (isBlank(getValues()) && !e.currentTarget.matches(":invalid")) {
+    if (isBlank(getValues())) {
       move(pondAfter(codes, marks, current));
       return;
     }
@@ -274,8 +270,6 @@ function AreaRound({
   const lastStatus = statusOf(last);
   const done = codes.filter((c) => marks[c]).length;
   const mark = marks[current];
-  const hint =
-    mark && empty ? "Type to correct this reading" : current && !lastStatus ? "Type the readings, then tap Save" : "";
   const period = PERIODS.find((p) => p.value === periodAt(past ?? localTime(now)))?.label;
   const failure = card.result && !card.result.ok ? card.result : null;
   const wrong = REQUIRED.map(({ name }) => errors[name]).filter(Boolean);
@@ -285,49 +279,46 @@ function AreaRound({
       {/* Stays on screen while the rows scroll, unless its optional readings make it too tall to. */}
       <Card size="sm" className={cn("z-10", !showMore && "sticky top-0")}>
         <CardContent className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Where, how far, and the last save. A fixed height, so nothing here moves the bar: Save must stay put. */}
+          <div className="flex min-h-11 items-center justify-between gap-2">
             <FieldLabel htmlFor="round-area" className="sr-only">
               Area
             </FieldLabel>
             <Choice id="round-area" items={areas} value={area.value} onChange={(v) => v && chooseArea(v)} />
-            <Badge variant="outline">{period}</Badge>
-            <Badge variant="outline">{past ? format(new Date(past), "d MMM, HH:mm") : format(now, "d MMM")}</Badge>
-          </div>
-          {/* A line of its own and a fixed height, so nothing here moves the bar: Save must stay put. */}
-          <div className="flex min-h-5 items-center justify-between gap-2 text-xs">
-            <span className="truncate tabular-nums">
-              {done} of {list.length} ponds
-              {waiting.size > 0 && ` · ${waiting.size} to send`}
-            </span>
-            <span role="status" className="flex min-w-0 justify-end">
-              {hint ? (
-                <span className="truncate text-muted-foreground">{hint}</span>
-              ) : (
-                lastStatus && (
-                  // Keyed: from one Pond to the next only a number changes, and each save must show.
-                  <StatusBadge key={last} status={lastStatus} className="animate-in zoom-in-95 fade-in">
-                    Pond {pondNumber(last)} {STATUS[lastStatus].word.toLowerCase()}
-                  </StatusBadge>
-                )
-              )}
-            </span>
+            <div className="flex min-w-0 flex-col items-end gap-1 text-xs">
+              <span className="tabular-nums">
+                {done} of {list.length} ponds
+              </span>
+              <span role="status" className="flex min-w-0 justify-end">
+                {mark && empty ? (
+                  <span className="truncate text-muted-foreground">Type to correct this reading</span>
+                ) : (
+                  lastStatus && (
+                    // Keyed: from one Pond to the next only a number changes, and each save must show.
+                    <StatusBadge key={last} status={lastStatus} className="animate-in zoom-in-95 fade-in">
+                      Pond {pondNumber(last)} {STATUS[lastStatus].word.toLowerCase()}
+                    </StatusBadge>
+                  )
+                )}
+              </span>
+            </div>
           </div>
           {current ? (
             <form
               noValidate
               onSubmit={next}
-              onInput={(e) => {
-                setBadInput(e.currentTarget.matches(":invalid"));
+              onInput={() => {
                 settleUntil.current = 0;
                 typedNow.current.add(current);
                 setCheck("");
               }}
               className="flex flex-col gap-2"
             >
-              <FieldGroup className={cn(COLUMNS, "items-end")}>
+              <FieldGroup className="grid grid-cols-[4.5rem_1fr_1fr] items-end gap-2">
+                {/* The largest thing here: it's checked against the number painted on the Pond. */}
                 <div>
                   <div className="text-xs text-muted-foreground">Pond</div>
-                  <div id="round-pond" className="text-2xl font-semibold tabular-nums">
+                  <div id="round-pond" className="text-4xl leading-12 font-semibold tabular-nums">
                     {pondNumber(current)}
                   </div>
                 </div>
@@ -338,9 +329,9 @@ function AreaRound({
                     </FieldLabel>
                     <Input
                       id={`round-${name}`}
-                      type="number"
+                      className="h-12 text-xl tabular-nums md:text-xl"
                       inputMode="decimal"
-                      step="any"
+                      autoComplete="off"
                       enterKeyHint={name === "temperature" ? "go" : "next"}
                       aria-invalid={!!errors[name]}
                       placeholder={mark?.[name]?.toString()} // the reading it has: type over it to correct it
@@ -355,15 +346,28 @@ function AreaRound({
                     />
                   </Field>
                 ))}
+              </FieldGroup>
+              {/* Right above the keyboard, where the thumb is. Anything that comes and goes stays below it. */}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-expanded={showMore}
+                  onClick={() => setMoreFor((was) => (was === current ? "" : current))}
+                >
+                  <ChevronDownIcon data-icon="inline-start" className={cn(showMore && "rotate-180")} />
+                  More readings
+                </Button>
                 <Button
                   type="submit"
+                  className="flex-1"
                   variant={empty ? "outline" : "default"}
                   onMouseDown={keepFocus}
                   disabled={card.pending}
                 >
                   {empty ? "Skip" : "Save"}
                 </Button>
-              </FieldGroup>
+              </div>
               {wrong.length > 0 && <FieldError errors={wrong} />}
               {check === current && (
                 <Alert>
@@ -375,20 +379,6 @@ function AreaRound({
                 </Alert>
               )}
               {failure && <ResultAlert result={failure} />}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="self-start"
-                aria-expanded={showMore}
-                onClick={() => {
-                  setMoreFor((was) => (was === current ? "" : current));
-                  setBadInput(false); // the unreadable text may be in an input this closes
-                }}
-              >
-                <ChevronDownIcon data-icon="inline-start" className={cn(showMore && "rotate-180")} />
-                More readings
-              </Button>
               {showMore && (
                 <FieldGroup>
                   <FieldGroup className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -422,6 +412,17 @@ function AreaRound({
       </Card>
       <OutboxAlert outbox={outbox} />
       <Card size="sm" className="gap-0 py-0">
+        {/* The Round's when: it never changes during a walk, so it's out of the bar. */}
+        <CardHeader className="pt-3">
+          <CardDescription>
+            {period} · {past ? format(new Date(past), "d MMM, HH:mm") : format(now, "d MMM")}
+          </CardDescription>
+        </CardHeader>
+        <div className={cn(COLUMNS, "px-3 pt-2 pb-1 text-xs text-muted-foreground")}>
+          <span>Pond</span>
+          <span>Oxygen</span>
+          <span>Temp.</span>
+        </div>
         {codes.map((pondCode) => {
           const reading = typed[pondCode] ?? marks[pondCode];
           return (
@@ -475,7 +476,8 @@ const PondRow = React.memo(function PondRow({
       onClick={() => open(pondCode)}
       className={cn(
         COLUMNS,
-        "h-auto w-full items-center justify-items-start rounded-none px-3 font-normal tabular-nums",
+        // The has-data one: Button narrows its padding for an icon, here the Badge's, which would shift this row's columns.
+        "h-auto w-full items-center justify-items-start rounded-none px-3 font-normal tabular-nums has-data-[icon=inline-start]:pl-3",
       )}
     >
       <span className="font-medium">{pondNumber(pondCode)}</span>

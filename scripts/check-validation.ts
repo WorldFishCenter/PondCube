@@ -31,6 +31,23 @@ bad(waterQualitySchema, { ...wq, ph: "abc" });
 bad(waterQualitySchema, { ...wq, dissolvedOxygen: "" }); // required
 assert.equal(waterQualitySchema.parse({ ...base, ...wq, ph: "" }).ph, undefined); // optional blank -> undefined
 
+// What's typed reads the same on every device: a decimal point or comma, and nothing is guessed.
+const typed = (v: unknown) => waterQualitySchema.safeParse({ ...base, ...wq, dissolvedOxygen: v });
+for (const [v, want] of [
+  ["1.5", 1.5],
+  ["1,5", 1.5],
+  ["6,25", 6.25],
+  [",5", 0.5],
+  [".5", 0.5],
+  ["5.", 5],
+  [" 5 ", 5],
+  [1e-7, 1e-7], // a number already read on the device, re-checked on the server
+] as const)
+  assert.equal(typed(v).data?.dissolvedOxygen, want, String(v));
+for (const v of ["1,500", "12,345", "1.2.3", "1,2,3", "0x10", "1e1", "Infinity", "-", "abc", "   "])
+  assert.ok(!typed(v).success, `must be refused, not guessed: ${v}`);
+assert.equal(waterQualitySchema.parse({ ...base, ...wq, ph: "   " }).ph, undefined); // spaces are blank, never 0
+
 ok(feedingSchema, { feedAmountKg: "0", feedingsCount: "3" });
 bad(feedingSchema, { feedAmountKg: "-1" });
 bad(feedingSchema, { feedAmountKg: "2", feedingsCount: "-1" });

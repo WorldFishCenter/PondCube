@@ -25,13 +25,7 @@ export function FeedingForm({ feeds, ...props }: RecordFormProps & { feeds: Feed
   } = form;
 
   return (
-    <RecordCard
-      id="feeding-form"
-      title="Feeding"
-      description="Record the feed given to the pond."
-      saveLabel="Save feeding"
-      {...card}
-    >
+    <RecordCard id="feeding-form" saveLabel="Save feeding" {...card}>
       <Controller
         control={control}
         name="feed"

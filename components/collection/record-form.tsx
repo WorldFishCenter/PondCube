@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -146,8 +146,6 @@ export function ResultAlert({ result }: { result: NonNullable<Result> }) {
 
 export function RecordCard({
   id,
-  title,
-  description,
   saveLabel,
   onSubmit,
   result,
@@ -155,8 +153,6 @@ export function RecordCard({
   children,
 }: {
   id: string;
-  title: string;
-  description: string;
   saveLabel: string;
   onSubmit: React.FormEventHandler<HTMLFormElement>;
   result: Result;
@@ -165,10 +161,6 @@ export function RecordCard({
 }) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
       <CardContent>
         {/* noValidate: zod shows every error in the same place instead of native browser bubbles. */}
         <form id={id} noValidate onSubmit={onSubmit}>
@@ -264,14 +256,8 @@ export function NumberField({
   return (
     <Field data-invalid={!!error}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input
-        id={id}
-        type="number"
-        inputMode={integer ? "numeric" : "decimal"}
-        step={integer ? 1 : "any"}
-        aria-invalid={!!error}
-        {...input}
-      />
+      {/* Text with a number keypad, not type="number": browsers read that per device ("1,500" as 1.5, or as nothing). */}
+      <Input id={id} inputMode={integer ? "numeric" : "decimal"} autoComplete="off" aria-invalid={!!error} {...input} />
       {error ? <FieldError errors={[error]} /> : hint ? <FieldDescription>{hint}</FieldDescription> : null}
     </Field>
   );

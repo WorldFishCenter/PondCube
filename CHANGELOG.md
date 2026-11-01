@@ -10,7 +10,9 @@ features the second, fixes the third.
 
 - Water readings are now taken in rounds, as the operators asked. Pick an area once and its ponds are listed with dissolved oxygen and temperature side by side. Type the two readings and tap Save: the app saves them and moves to the next pond, about two taps per pond instead of six. On a pond left empty the same button says Skip, and no reading is made for it.
 - Save stays in the same place under your thumb. The entry bar moves to the top of the screen when you tap into it or tap a pond, and the list then follows it.
-- Each pond in the list says where its reading is: Saved, Waiting (kept on this phone until it can be sent) or Not saved. The entry bar confirms each save as you go, and shows how far you got and how many are waiting.
+- Each pond in the list says where its reading is: Saved, Waiting (kept on this phone until it can be sent) or Not saved. The entry bar confirms each save as you go, and shows how far you got.
+- The entry bar is built around the walk from pond to pond: a big pond number to check against the pond, larger boxes for the two readings, and Save right above the keyboard. Morning or afternoon and the date moved to the top of the list.
+- Decimals work the same on every phone, with a point or a comma (1.5 or 1,5), on every tab. A number that could be misread, such as 1,500, is refused with a message rather than saved as something else.
 - On a pond where nothing has been typed, Skip works only once the pond has been on screen for a second, so a double tap can't skip a pond.
 - Each reading takes the time you tap Save, so there's no date to set. To type in readings written down on paper, turn on Typing from paper and set when you took them. After more than half an hour away from the app, it asks for that date and time again.
 - The app shows how far you got in the round, even after closing it, and starts a new round on its own in the afternoon and the next day. It keeps saving with no signal, as before.
@@ -19,6 +21,7 @@ features the second, fixes the third.
 - To correct a reading during the round, tap its pond and type the new values. They replace the old ones in the download, its averages and the data link, at the time of the reading they correct, even if you correct it after noon. The old values are kept in the database.
 - The pond list on the Feeding, Mortality and Sampling tabs is grouped by area, and those tabs open on the pond the round has reached.
 - The notice about records waiting to send no longer appears while a record is sending normally, so the screen doesn't jump. On the Water tab it sits under the entry bar, so Save stays under your thumb when the signal drops.
+- Less to read and scroll past: the tabs are now at the top of the screen, with the entry bar right under them. The "Who, where & when" panel and the titles repeating each tab's name are gone, and your name now sits under the app's title.
 - Easier to read: the links at the bottom of the screen in dark mode, red warnings and errors, and grey helper text.
 - The app now looks and reads the same in every section. A record's state has the same word, icon and colour everywhere. Units are always in the field's name, every optional field says Optional, and the free-text box is always called Remarks. Numbered instructions and tabs look the same everywhere, and the sign-in page has the app's header.
 - Every button and field is now big enough to tap easily, including the date button, the pond field, the theme button, the Typing from paper switch and the links at the bottom of the screen.

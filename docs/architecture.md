@@ -180,7 +180,12 @@ says Save once something is typed and Skip on an empty Pond. The inputs stay the
 the keyboard stays up. The button never moves under the thumb: the page scrolls to bring the bar to the top only on a
 tap into it or on a row, and once it's there the list scrolls under it. A Pond's state is one Badge, the same in its
 row and in the bar's confirmation: Saved, Waiting (in the Outbox) or Not saved (a Draft left behind). The Outbox notice
-sits under the bar on this tab, not in the top panel, so it can't move the button when it comes or goes.
+sits under the bar on this tab, not above it, so it can't move the button when it comes or goes. The bar holds
+only what changes at each Pond; the Period and date, which don't, head the list.
+
+Number fields, on every tab, are text with a number keypad, not `type="number"`: browsers read that per device and
+region (`1,500` as 1.5 or as nothing, `1,5` as 1.5 or as nothing). `toNumber` in `lib/validation.ts` reads what's
+typed instead, the same everywhere: a decimal comma is a point, and a comma before three digits is refused.
 
 There's no new write path: the bar is one record form (`useRecordForm`) on the Pond reached, so each Pond has its
 Draft, and each Save puts one Record in the Outbox, never waiting for the network. A Pond left blank makes no Record. Retyping a Pond that has a reading in this Round makes a Correction: a new Record that names

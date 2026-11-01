@@ -48,8 +48,8 @@ in the WorldFish DMS v5.
 _Avoid_: enumerator, author, creator
 
 **Who & where**
-The signed-in Operator and the Pond being recorded: chosen in the top panel ("Who, where & when", with Recorded-at), or
-in a Round the one it has reached. Every Record made there carries both.
+The signed-in Operator (named under the app's title) and the Pond being recorded: chosen above the form, with
+Recorded-at, or in a Round the one it has reached. Every Record made there carries both.
 _Avoid_: context, session
 
 ## Records
@@ -64,7 +64,7 @@ Mortality record or Sampling event.
 _Avoid_: record type, form, tab
 
 **Water-quality reading**
-Dissolved oxygen and temperature (required) plus optional pH, ammonia, nitrite and
+Dissolved oxygen ("Oxygen" in the Round's bar, for room) and temperature (required) plus optional pH, ammonia, nitrite and
 nitrate, taken in a Period.
 _Avoid_: WQ entry, measurement
 
@@ -111,7 +111,7 @@ _Avoid_: edit, amendment, overwrite
 The instant the observation was made (not when it was saved), in the Operator's local time. In a Round it's the moment
 of tapping Save, or with Typing from paper on, one date and time set for the readings being typed in; a Correction keeps
 the one it corrects. For the other Record
-kinds it's set in the top panel for each Record: it starts empty and clears after every save, so no Record inherits an
+kinds it's set above the form for each Record: it starts empty and clears after every save, so no Record inherits an
 earlier one's time. Never later than now.
 _Avoid_: timestamp, created at, date
 

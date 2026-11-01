@@ -6,9 +6,8 @@ import { Info } from "lucide-react";
 import { readLocal, writeLocal } from "@/lib/storage";
 import type { RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Field, FieldContent, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,14 +37,17 @@ const TABS = {
   sampling: { label: "Sampling", Form: SamplingForm },
 } satisfies Record<RecordKind, { label: string; Form?: React.ComponentType<RecordFormProps & { feeds: Feed[] }> }>;
 
-export function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ person, children }: { person?: string; children: React.ReactNode }) {
   return (
     <main className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 py-6 md:max-w-2xl md:py-10">
       <header className="flex items-center justify-between gap-4">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+        <div className="flex min-w-0 items-center gap-2">
           <PondCubeLogo />
-          PondCube Collect
-        </h1>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-tight">PondCube Collect</h1>
+            {person && <p className="truncate text-xs text-muted-foreground">Recording as {person}</p>}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Show when="signed-in">
@@ -58,13 +60,22 @@ export function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Same footprint as the loaded app, so nothing jumps when data and saved choices arrive.
+// Same footprint as the Water tab, so nothing jumps when data and saved choices arrive.
+function TabsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-12.5 w-full" />
+      <Skeleton className="h-11 w-full" />
+      <Skeleton className="h-51 w-full rounded-xl" />
+      <Skeleton className="h-96 w-full rounded-xl" />
+    </div>
+  );
+}
+
 export function CollectionSkeleton() {
   return (
     <Shell>
-      <Skeleton className="h-72 w-full rounded-xl md:h-44" />
-      <Skeleton className="h-12.5 w-full" />
-      <Skeleton className="h-96 w-full rounded-xl" />
+      <TabsSkeleton />
     </Shell>
   );
 }
@@ -127,68 +138,9 @@ export function CollectionApp({
   const when = { value: recordedAt, clear: () => chooseRecordedAt("") };
 
   return (
-    <Shell>
-      <Card>
-        <CardHeader>
-          <CardTitle>Who, where &amp; when</CardTitle>
-          <CardDescription>
-            You&apos;re recording as the signed-in operator.{" "}
-            {kind === "wq"
-              ? "Each reading takes the time you tap Save."
-              : "The pond is remembered on this device. Set the date & time for each record."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FieldGroup className="grid gap-4 md:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="operator">Person</FieldLabel>
-              <Input id="operator" value={person} readOnly />
-            </Field>
-            {kind === "wq" ? (
-              <>
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldLabel htmlFor="past-readings">Typing from paper</FieldLabel>
-                    <FieldDescription>
-                      Turn on to type in readings you wrote down earlier. Set when you took them, and every reading gets
-                      that time.
-                    </FieldDescription>
-                  </FieldContent>
-                  <Switch
-                    id="past-readings"
-                    className="after:-inset-y-3.5" // a 44px touch target, as the app's other controls
-                    checked={past !== null}
-                    onCheckedChange={(on) => setPast(on ? "" : null)}
-                  />
-                </Field>
-                {past !== null && (
-                  <div className="md:col-span-2">
-                    <RecordedAtField id="past-at" value={past} onChange={setPast} />
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <Field>
-                  <FieldLabel htmlFor="pond">Pond</FieldLabel>
-                  <PondCombobox id="pond" ponds={ponds} value={pondCode} onChange={choosePond} />
-                </Field>
-                <div className="md:col-span-2">
-                  <RecordedAtField id="recorded-at" value={recordedAt} onChange={chooseRecordedAt} />
-                </div>
-              </>
-            )}
-            {/* In a Round it's under the bar: above, it would move Save. */}
-            {kind !== "wq" && <OutboxAlert outbox={outbox} className="md:col-span-2" />}
-          </FieldGroup>
-        </CardContent>
-      </Card>
-
+    <Shell person={person}>
       {!restored ? (
-        <>
-          <Skeleton className="h-12.5 w-full" />
-          <Skeleton className="h-96 w-full rounded-xl" />
-        </>
+        <TabsSkeleton />
       ) : (
         <Tabs value={kind} onValueChange={setKind}>
           <TabsList className="w-full">
@@ -198,6 +150,35 @@ export function CollectionApp({
               </TabsTrigger>
             ))}
           </TabsList>
+          {kind === "wq" ? (
+            <FieldGroup className="gap-2 px-1">
+              <Field orientation="horizontal" className="min-h-11 items-center">
+                <FieldContent>
+                  <FieldLabel htmlFor="past-readings">Typing from paper</FieldLabel>
+                </FieldContent>
+                <Switch
+                  id="past-readings"
+                  className="after:-inset-y-3.5" // a 44px touch target, as the app's other controls
+                  checked={past !== null}
+                  onCheckedChange={(on) => setPast(on ? "" : null)}
+                />
+              </Field>
+              {past !== null && <RecordedAtField id="past-at" value={past} onChange={setPast} />}
+            </FieldGroup>
+          ) : (
+            <Card>
+              <CardContent>
+                <FieldGroup className="gap-4">
+                  <Field>
+                    <FieldLabel htmlFor="pond">Pond</FieldLabel>
+                    <PondCombobox id="pond" ponds={ponds} value={pondCode} onChange={choosePond} />
+                  </Field>
+                  <RecordedAtField id="recorded-at" value={recordedAt} onChange={chooseRecordedAt} />
+                  <OutboxAlert outbox={outbox} />
+                </FieldGroup>
+              </CardContent>
+            </Card>
+          )}
           {Object.entries(TABS).map(([value, tab]) => (
             <TabsContent key={value} value={value}>
               {!("Form" in tab) ? (
