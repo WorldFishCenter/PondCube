@@ -329,7 +329,8 @@ function AreaRound({
                     </FieldLabel>
                     <Input
                       id={`round-${name}`}
-                      className="h-12 text-xl tabular-nums md:text-xl"
+                      // Faded past the 4.5:1 rule on purpose: its row shows the same reading at full strength.
+                      className="h-12 text-xl tabular-nums placeholder:text-muted-foreground/70 md:text-xl"
                       inputMode="decimal"
                       autoComplete="off"
                       enterKeyHint={name === "temperature" ? "go" : "next"}

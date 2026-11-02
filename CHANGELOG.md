@@ -18,7 +18,7 @@ features the second, fixes the third.
 - The app shows how far you got in the round, even after closing it, and starts a new round on its own in the afternoon and the next day. It keeps saving with no signal, as before.
 - pH, ammonia, nitrate, nitrite and remarks are under More readings, on the pond that needs them. They close again on the next pond.
 - A reading typed earlier and never saved (on another day, or by someone else on this phone) shows on its pond, but it's saved only if you tap Save a second time or type over it.
-- To correct a reading during the round, tap its pond and type the new values. They replace the old ones in the download, its averages and the data link, at the time of the reading they correct, even if you correct it after noon. The old values are kept in the database.
+- To correct a reading during the round, tap its pond: its values show faded in the boxes, and you type the new ones over them. They replace the old ones in the download, its averages and the data link, at the time of the reading they correct, even if you correct it after noon. The old values are kept in the database.
 - The pond list on the Feeding, Mortality and Sampling tabs is grouped by area, and those tabs open on the pond the round has reached.
 - The notice about records waiting to send no longer appears while a record is sending normally, so the screen doesn't jump. On the Water tab it sits under the entry bar, so Save stays under your thumb when the signal drops.
 - Less to read and scroll past: the tabs are now at the top of the screen, with the entry bar right under them. The "Who, where & when" panel and the titles repeating each tab's name are gone, and your name now sits under the app's title.
