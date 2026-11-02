@@ -217,6 +217,9 @@ export function createRound({
       });
       return parsed.success ? { saving: save(parsed.data, at, !paperAt) } : { invalid: parsed.error };
     },
+    /** What a Pond's row shows: what's typed and not saved, over the reading it has. */
+    shown: (pondCode: string, field: "dissolvedOxygen" | "temperature") =>
+      String((view.typed[pondCode]?.[field] || view.marks[pondCode]?.[field]) ?? ""),
     /** Where a Pond's reading is; `waiting` holds the ids in the Outbox. */
     status: (pondCode: string, waiting: Set<string>) => {
       const mark = view.marks[pondCode];

@@ -101,6 +101,7 @@ export const noticeShown = ({ mine, others, sending, stopped }: Outbox) =>
 export function OutboxAlert({ outbox }: { outbox: Outbox }) {
   const { mine, others, sending, stopped, flush } = outbox;
   if (!noticeShown(outbox)) return null;
+  const why = stopped ?? (mine.some((w) => !w.problem) ? "offline" : undefined); // one the server refused isn't waiting for signal
 
   return (
     // Wider action slot than the stock pr-18, so "Send now" fits at the 44px touch size.
@@ -108,7 +109,7 @@ export function OutboxAlert({ outbox }: { outbox: Outbox }) {
       <CloudUpload />
       <AlertTitle>{sending ? "Sending…" : `${records(mine.length + others.length)} waiting to send`}</AlertTitle>
       <AlertDescription>
-        {mine.length > 0 && <p>{WHY_NOT_SENT[stopped ?? "offline"]}</p>}
+        {why && <p>{WHY_NOT_SENT[why]}</p>}
         {mine.map(({ record, problem }) =>
           problem ? (
             <p key={record.id}>

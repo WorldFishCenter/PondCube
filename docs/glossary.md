@@ -70,7 +70,7 @@ _Avoid_: WQ entry, measurement
 
 **Round**
 An Operator's walk through an Area's Ponds in one Period (one still going past noon stays the same Round), taking a Water-quality reading at each. Each filled row is its
-own Record, saved by tapping Save; on a Pond left empty that button says Skip, and makes none. The Round itself isn't stored: its progress is kept on the
+own Record, saved by tapping Save; on a Pond left empty that button says Skip (No change, if it has a reading), and makes none. The Round itself isn't stored: its progress is kept on the
 device, to show how far the Operator got and what a Correction replaces.
 _Avoid_: session, batch, shift
 
@@ -102,8 +102,8 @@ fish within a Sampling event.
 _Avoid_: fish row, specimen
 
 **Correction**
-A Water-quality reading that replaces an earlier one of the same Pond: made by retyping the Pond in the Round that has
-its reading. It keeps that reading's Recorded-at, as the same observation, and its values in any field left blank. The
+A Water-quality reading that replaces an earlier one of the same Pond: made by typing at the Pond, in the Round that has
+its reading, to change it or add to it. It keeps that reading's Recorded-at, as the same observation, and its values in any field left blank. The
 replaced reading stays stored but isn't shown in the download or the data link.
 _Avoid_: edit, amendment, overwrite
 

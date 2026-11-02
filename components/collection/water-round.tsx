@@ -153,7 +153,7 @@ function AreaRound({
     () => createRound({ round: roundId, pondCodes: codes, keep: (record) => add("wq", record), onPond }),
     [roundId, codes, add, onPond],
   );
-  const { current, draft, marks, typed, last, rechecking, saving, failure } = React.useSyncExternalStore(
+  const { current, draft, marks, last, rechecking, saving, failure } = React.useSyncExternalStore(
     round.subscribe,
     round.view,
     round.view,
@@ -191,8 +191,9 @@ function AreaRound({
 
   const open = React.useCallback(
     (code: string) => {
-      if (!flushSync(() => round.open(code))) return; // the inputs must exist for the focus, still in the tap
+      if (round.view().saving) return; // the save finishes on its own Pond
       follow(top.current, code, true);
+      flushSync(() => round.open(code)); // the inputs must exist for the focus, still in the tap
       setFocus("dissolvedOxygen");
     },
     [round, setFocus],
@@ -235,7 +236,7 @@ function AreaRound({
               </span>
               <span role="status" className="flex min-w-0 justify-end">
                 {mark && empty ? (
-                  <span className="truncate text-muted-foreground">Type only what&apos;s wrong</span>
+                  <span className="truncate text-muted-foreground">Empty boxes stay the same</span>
                 ) : (
                   lastStatus && (
                     // Keyed: from one Pond to the next only a number changes, and each save must show.
@@ -305,7 +306,7 @@ function AreaRound({
                   onMouseDown={keepFocus}
                   disabled={saving}
                 >
-                  {empty ? "Skip" : "Save"}
+                  {empty ? (mark ? "No change" : "Skip") : "Save"}
                 </Button>
               </div>
               {wrong.length > 0 && <FieldError errors={wrong} />}
@@ -372,20 +373,17 @@ function AreaRound({
             <span key={name}>{label}</span>
           ))}
         </div>
-        {codes.map((pondCode) => {
-          const reading = typed[pondCode] ?? marks[pondCode];
-          return (
-            <PondRow
-              key={pondCode}
-              pondCode={pondCode}
-              isCurrent={pondCode === current}
-              oxygen={String(reading?.dissolvedOxygen ?? "")}
-              temperature={String(reading?.temperature ?? "")}
-              status={round.status(pondCode, waiting)}
-              open={open}
-            />
-          );
-        })}
+        {codes.map((pondCode) => (
+          <PondRow
+            key={pondCode}
+            pondCode={pondCode}
+            isCurrent={pondCode === current}
+            oxygen={round.shown(pondCode, "dissolvedOxygen")}
+            temperature={round.shown(pondCode, "temperature")}
+            status={round.status(pondCode, waiting)}
+            open={open}
+          />
+        ))}
       </Card>
     </div>
   );

@@ -176,7 +176,7 @@ storage: for the same reason the drawer warns about Records waiting in the Outbo
 The Water tab is a Round (`components/collection/water-round.tsx`), built on the Penang operators' feedback of
 2026-10-31: almost 245 Ponds a round, at least six taps per Pond with one form per Record. An Area is picked once.
 A bar with the Pond reached, its two required readings and one button sits over a list of the Area's Ponds. The button
-says Save once something is typed and Skip on an empty Pond. The inputs stay the same elements from Pond to Pond, so
+says Save once something is typed, Skip on an empty Pond, and No change on one that has a reading. The inputs stay the same elements from Pond to Pond, so
 the keyboard stays up. The button never moves under the thumb: the page scrolls to bring the bar to the top only on a
 tap into it or on a row, and once it's there the list scrolls under it. Opening More readings unsticks the bar, so the
 page scrolls back to it and it stays where it was on screen. A Pond's state is one Badge, the same in its

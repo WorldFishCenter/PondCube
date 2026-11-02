@@ -326,6 +326,21 @@ async function main() {
   rows.r.open("A");
   assert.equal(rows.r.status("B", new Set()), "typed");
 
+  // A row shows what's typed over the reading it has: adding pH to a reading doesn't blank its row. A 0 is a value.
+  const added = phone();
+  await added.save(typed({ dissolvedOxygen: "0" }));
+  added.r.open("A");
+  added.r.view().draft.change(typed({ dissolvedOxygen: "", temperature: "", ph: "7" }));
+  added.r.open("B");
+  assert.equal(added.r.status("A", new Set()), "typed");
+  assert.equal(added.r.shown("A", "dissolvedOxygen"), "0");
+  assert.equal(added.r.shown("A", "temperature"), "28.1");
+  added.r.open("A");
+  added.r.view().draft.change(typed({ dissolvedOxygen: "6", temperature: "" }));
+  added.r.open("B");
+  assert.equal(added.r.shown("A", "dissolvedOxygen"), "6", "what's typed wins");
+  assert.equal(added.r.shown("C", "temperature"), "", "no reading, nothing typed");
+
   // A row typed in and left unsaved is findable; an empty or unreadable Draft, or another kind's, isn't one.
   const drafts = memory();
   drafts.setItem(draftKey("wq", "A"), JSON.stringify(typed()));

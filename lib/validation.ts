@@ -31,8 +31,8 @@ export const RANGES = {
 const optNum = (min?: number, max?: number, int = false) => {
   let s = z.number({ error: "Must be a number" });
   if (int) s = s.int("Must be a whole number");
-  if (min !== undefined) s = s.min(min, `Must be ≥ ${min}`);
-  if (max !== undefined) s = s.max(max, `Must be ≤ ${max}`);
+  if (min !== undefined) s = s.min(min, `Expected ${min}–${max}`);
+  if (max !== undefined) s = s.max(max, `Expected ${min}–${max}`);
   return z.preprocess(toNumber(max ?? Infinity), s.optional());
 };
 

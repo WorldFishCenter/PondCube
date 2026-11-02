@@ -168,6 +168,12 @@ export function RecordCard({
   pending: boolean;
   children: React.ReactNode;
 }) {
+  const message = React.useRef<HTMLDivElement>(null);
+  const hasResult = !!result;
+  // Off screen below Save, a tap would seem to do nothing.
+  React.useEffect(() => {
+    if (hasResult) message.current?.scrollIntoView({ block: "nearest" });
+  }, [hasResult]);
   return (
     <Card>
       <CardContent>
@@ -185,7 +191,11 @@ export function RecordCard({
           {pending && <Spinner data-icon="inline-start" />}
           {saveLabel}
         </Button>
-        {result ? <ResultAlert result={result} /> : null}
+        {result ? (
+          <div ref={message} className="w-full">
+            <ResultAlert result={result} />
+          </div>
+        ) : null}
       </CardFooter>
     </Card>
   );
