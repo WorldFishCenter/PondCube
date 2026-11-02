@@ -5,7 +5,8 @@ export const PERIODS = [
 // Before noon: morning. Compared with a local "HH" or "HH:mm" text, on the device and in the export view.
 export const NOON = "12";
 /** The Period of a local "YYYY-MM-DDTHH:mm". */
-export const periodAt = (local: string) => (local.split("T")[1] < NOON ? "morning" : "afternoon");
+export const periodAt = (local: string): (typeof PERIODS)[number]["value"] =>
+  local.split("T")[1] < NOON ? "morning" : "afternoon";
 
 // ponytail: the old Penang log's area order; other areas follow alphabetically. Put an order in Airtable when another site has areas.
 const AREA_ORDER = [
@@ -20,6 +21,29 @@ const AREA_ORDER = [
 ];
 const areaRank = (area: string) => (AREA_ORDER.includes(area) ? AREA_ORDER.indexOf(area) : AREA_ORDER.length);
 export const byArea = (a: string, b: string) => areaRank(a) - areaRank(b) || a.localeCompare(b);
+
+/** Ponds by Site and Area, Areas in walking order, ponds as given. Named with the Site only when there are several. */
+export function areasOf<P extends { site: string; area: string }>(ponds: P[]) {
+  const several = new Set(ponds.map((p) => p.site)).size > 1;
+  const areas = new Map<string, { value: string; site: string; area: string; label: string; items: P[] }>();
+  for (const pond of ponds) {
+    const value = `${pond.site}:${pond.area}`;
+    const known = areas.get(value);
+    if (known) known.items.push(pond);
+    else
+      areas.set(value, {
+        value,
+        site: pond.site,
+        area: pond.area,
+        label: several ? `${pond.site} · ${pond.area}` : pond.area,
+        items: [pond],
+      });
+  }
+  return [...areas.values()].sort((a, b) => a.site.localeCompare(b.site) || byArea(a.area, b.area));
+}
+
+/** The number a pond code ends in, as painted on the Pond; the whole code if it has none. */
+export const pondNumber = (pondCode: string) => Number(pondCode.match(/\d+$/)?.[0] ?? NaN) || pondCode;
 
 // WorldFish DMS v5 causes of death (CAUSE_DEATH), in its order, shown as the DMS writes them.
 export const CAUSES = [

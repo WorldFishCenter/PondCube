@@ -64,14 +64,14 @@ Mortality record or Sampling event.
 _Avoid_: record type, form, tab
 
 **Water-quality reading**
-Dissolved oxygen ("Oxygen" in the Round's bar, for room) and temperature (required) plus optional pH, ammonia, nitrite and
+Dissolved oxygen ("Oxygen" in the Round, for room) and temperature (required) plus optional pH, ammonia, nitrite and
 nitrate, taken in a Period.
 _Avoid_: WQ entry, measurement
 
 **Round**
-An Operator's walk through an Area's Ponds in one Period, taking a Water-quality reading at each. Each filled row is its
+An Operator's walk through an Area's Ponds in one Period (one still going past noon stays the same Round), taking a Water-quality reading at each. Each filled row is its
 own Record, saved by tapping Save; on a Pond left empty that button says Skip, and makes none. The Round itself isn't stored: its progress is kept on the
-device, only to show how far the Operator got.
+device, to show how far the Operator got and what a Correction replaces.
 _Avoid_: session, batch, shift
 
 **Period**
@@ -103,8 +103,8 @@ _Avoid_: fish row, specimen
 
 **Correction**
 A Water-quality reading that replaces an earlier one of the same Pond: made by retyping the Pond in the Round that has
-its reading. It keeps that reading's Recorded-at, as the same observation. The replaced reading stays stored but isn't
-shown in the download or the data link.
+its reading. It keeps that reading's Recorded-at, as the same observation, and its values in any field left blank. The
+replaced reading stays stored but isn't shown in the download or the data link.
 _Avoid_: edit, amendment, overwrite
 
 **Recorded-at**

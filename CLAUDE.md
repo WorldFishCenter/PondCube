@@ -58,11 +58,11 @@ components/sign-in-card.tsx  Clerk's sign-in, with the app's width and touch siz
 components/collection/*    App UI: shell (Operator's name, record kinds → tabs, Pond + date above the forms), not-on-list card, pond picker,
                           water-round.tsx = the Water tab, a Round through an Area (one form on the Pond reached, rows below);
                           the 3 other forms, feedback sheet (Airtable form), data sheet ("Your data": download + data link);
-                          record-form.tsx = shared form hook (draft, save) + fields + STATUS, StatusBadge, FILLED_TAB;
+                          record-form.tsx = shared form hooks (draft, save) + fields + STATUS, StatusBadge, FILLED_TAB;
                           outbox.tsx = sending to app/api/records + the "waiting to send" notice
 lib/schema.ts             Drizzle tables and export views (PROVISIONAL names) — the single source of truth for the data model
 lib/export.ts             Seeing the data: readRows (the only site filter on rows people see), data link keys, CSV
-lib/workbook.ts           The water-quality .xlsx (write-excel-file, plus table + comment "features"; Penang area order)
+lib/workbook.ts           The water-quality .xlsx (write-excel-file, plus table + comment "features")
 lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules; RECORD_KINDS; withNewNames() reads
                           Drafts and Outbox Records saved before 0.8.0
 lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing; the caller names the Person
@@ -70,12 +70,12 @@ lib/data.ts               Server-only cached reads (operator by email, a site's 
 lib/access.ts             Signed-in access, and a data link key's access: wires Clerk into lib/operators.ts (server-only)
 lib/operators.ts          Operator access: account → signed out / not on the list / Operator (with sites); refusal() = pond not at
                           their sites or feed not used there; email normaliser (shared with sync)
-lib/storage.ts            Device storage seam (localStorage, guarded): Drafts, Outbox, remembered pond and Recorded-at
+lib/storage.ts            Device storage seam (localStorage, guarded): Drafts, Outbox, Round marks, remembered pond and Recorded-at
 lib/draft.ts              Draft per record kind + pond: restore, change, submit to the Outbox (only that clears it; storage + keep injected)
 lib/outbox.ts             Outbox: saved Records waiting on the device, sent one at a time oldest first, removed only once stored (storage + send injected)
-lib/round.ts              A Round's progress on the device (marks per day + Period), and its way through a list of Ponds
+lib/round.ts              A Round on the device: which one it is, how far it got (marks per day + Period), what a tap on Save or Skip comes to, what a Correction keeps (storage + clock + keep injected)
 lib/db.ts                 Neon HTTP + Drizzle client (server-only)
-lib/options.ts            Choice lists (periods, causes); feeds come from each site's list in the database
+lib/options.ts            Choice lists (periods, causes), the Period of a time, Areas in walking order, a pond code's number; feeds come from each site's list in the database
 lib/version.ts            App version from package.json (server-only: footer, feedback form)
 scripts/sync-airtable.ts  Airtable (PondCube base: sites, species, feeds, ponds, operators) → Neon, same tables
 scripts/import-legacy.ts  One-off: legacy Excel log (converted CSV) → wq_readings; its decisions are in the file header
@@ -148,8 +148,10 @@ These favour care over speed; on trivial tasks, use judgment.
   half-entered record. A Draft clears only once its Record is in the Outbox, and the
   Outbox drops a Record only once the server has stored it. Don't add a code path
   that can drop either.
-- **A Round's progress is only for showing.** Its marks (`lib/round.ts`) say how far the Operator got; each reading
-  goes through its Draft and the Outbox like any Record. Never decide what's saved or sent from them.
+- **A Round's progress says how far the Operator got.** Its marks (`lib/round.ts`) never decide whether a
+  Record is saved or sent: each reading goes through its Draft and the Outbox like any Record. The one thing read from them
+  for a save is what a Correction replaces and keeps. A Round's rules live in `createRound`, checked through the same taps
+  the Operator makes; `water-round.tsx` keeps only focus, scroll and rendering.
 - **Recorded-at is an instant, not a wall-clock string.** The device reads local
   time; the server accepts only a Date or an ISO string with an offset/Z, so an
   observation's true instant is preserved regardless of server timezone.

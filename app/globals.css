@@ -156,9 +156,13 @@
   [data-slot$="-close"]:has(> .sr-only) {
     min-width: var(--touch-target);
   }
+}
 
-  /* Teal text: in dark, --primary is a fill, too dark to read as text. */
-  .dark .text-primary {
-    --primary: var(--sidebar-primary);
-  }
+/* Outside a layer, to beat the stock utilities they correct. */
+[data-slot="switch"]::after {
+  inset-block: calc((100% - var(--touch-target)) / 2);
+}
+/* Teal text: in dark, --primary is a fill, too dark to read as text. */
+.dark .text-primary {
+  color: var(--sidebar-primary);
 }

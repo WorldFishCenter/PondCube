@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { CAUSES, PERIODS } from "./options";
 
-// What's typed, read the same on every device; NaN then fails z.number. A comma is a decimal comma: some phones' keypads
-// have no point. Only where a field allows a thousand or more can "1,500" be thousands, so there it's refused, not guessed.
+// Reads what's typed, the same on every device (NaN fails z.number). "1,500" is refused only where it could be thousands.
 const toNumber = (max: number) => (v: unknown) => {
   if (typeof v !== "string") return v ?? undefined;
   const text = v.trim();

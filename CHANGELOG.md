@@ -9,18 +9,19 @@ features the second, fixes the third.
 ### Changed
 
 - Water readings are now taken in rounds, as the operators asked. Pick an area once and its ponds are listed with dissolved oxygen and temperature side by side. Type the two readings and tap Save: the app saves them and moves to the next pond, about two taps per pond instead of six. On a pond left empty the same button says Skip, and no reading is made for it.
-- Save stays in the same place under your thumb. The entry bar moves to the top of the screen when you tap into it or tap a pond, and the list then follows it.
+- Save stays in the same place under your thumb, even when you open More readings. The entry bar moves to the top of the screen when you tap into it or tap a pond, and the list then follows it.
 - Each pond in the list says where its reading is: Saved, Waiting (kept on this phone until it can be sent) or Not saved. The entry bar confirms each save as you go, and shows how far you got.
 - The entry bar is built around the walk from pond to pond: a big pond number to check against the pond, larger boxes for the two readings, and a wide Save button right under them. Morning or afternoon and the date moved to the top of the list.
 - Decimals work the same on every phone, with a point or a comma (1.5 or 1,5), on every tab. A number that could mean two things, such as 1,500 kg of feed, is refused with a message rather than guessed.
 - On a pond where nothing has been typed, Skip works only once the pond has been on screen for a second, so a double tap can't skip a pond.
-- Each reading takes the time you tap Save, so there's no date to set. To type in readings written down on paper, turn on Typing from paper and set when you took them. After more than half an hour away from the app, it asks for that date and time again.
+- Each reading takes the time you tap Save, so there's no date to set. To type in readings written down on paper, turn on Typing from paper and set when you took them. It stays on if the app reloads, so those readings keep their time. After more than half an hour away from the app, it asks for that date and time again.
 - The app shows how far you got in the round, even after closing it, and starts a new round on its own in the afternoon and the next day. It keeps saving with no signal, as before.
 - pH, ammonia, nitrate, nitrite and remarks are under More readings, on the pond that needs them. They close again on the next pond.
-- A reading typed earlier and never saved (on another day, or by someone else on this phone) shows on its pond, but it's saved only if you tap Save a second time or type over it.
-- To correct a reading during the round, tap its pond: its values show faded in the boxes, and you type the new ones over them. They replace the old ones in the download, its averages and the data link, at the time of the reading they correct, even if you correct it after noon. The old values are kept in the database.
+- A reading typed earlier and never saved (on another day, say) shows on its pond, but it's saved only if you tap Save a second time or type over it.
+- If your phone has no room left and the signal drops as you save, tapping Save again can't store the same record twice.
+- To correct a reading during the round, tap its pond: its values show faded in the boxes. Type only what's wrong: anything you leave empty keeps its value, including pH and remarks. The new values replace the old ones in the download, its averages and the data link, at the time of the reading they correct, even if you correct it after noon. The old values are kept in the database.
 - The pond list on the Feeding, Mortality and Sampling tabs is grouped by area, and those tabs open on the pond the round has reached.
-- The notice about records waiting to send no longer appears while a record is sending normally, so the screen doesn't jump. On the Water tab it sits under the entry bar, so Save stays under your thumb when the signal drops.
+- The notice about records waiting to send no longer appears while a record is sending normally, so the screen doesn't jump. It now sits below the entry bar or the form, as do the messages after saving, so Save stays under your thumb.
 - Less to read and scroll past: the tabs are now at the top of the screen, with the entry bar right under them. The "Who, where & when" panel and the titles repeating each tab's name are gone, and your name now sits under the app's title.
 - Easier to read: the links at the bottom of the screen in dark mode, red warnings and errors, and grey helper text.
 - The app now looks and reads the same in every section. A record's state has the same word, icon and colour everywhere. Units are always in the field's name, every optional field says Optional, and the free-text box is always called Remarks. Numbered instructions and tabs look the same everywhere, and the sign-in page has the app's header.
@@ -89,7 +90,7 @@ features the second, fixes the third.
 
 - Saving on a weak connection can no longer store the same record twice.
 - A record saved without signal keeps its own date and time; setting the time for the next pond no longer changes it.
-- On a shared device, records wait for the operator who made them to sign in, so they are never saved under someone else's name.
+- Records wait for the operator who made them to sign in, so they are never saved under someone else's name.
 - The app now opens without signal straight after you first sign in. Before, it had to be opened once more with signal first.
 - The feedback form's close button is now easy to see, in a strip at the top. In dark mode it was almost invisible.
 

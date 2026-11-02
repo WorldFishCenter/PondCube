@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { areasOf } from "@/lib/round";
+import { areasOf } from "@/lib/options";
 import {
   Combobox,
   ComboboxCollection,

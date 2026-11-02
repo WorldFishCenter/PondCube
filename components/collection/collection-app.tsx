@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Show, UserButton } from "@clerk/nextjs";
 import { Info } from "lucide-react";
+import { keepLeftApp, keepPaperAt, paperAfterAway, restorePaperAt, type PaperAt } from "@/lib/round";
 import { readLocal, writeLocal } from "@/lib/storage";
 import type { RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -26,16 +27,18 @@ import { SamplingForm } from "./sampling-form";
 
 const POND_KEY = "pondcube:lastPond";
 const RECORDED_AT_KEY = "pondcube:recordedAt"; // kept so a refresh mid-record doesn't lose it
-const AWAY = 30 * 60_000; // ms away from the app after which Past readings' time is cleared
 
-// One tab per Record kind (lib/validation.ts RECORD_KINDS; the compiler flags a missing one), in tab
-// order. Each form owns its fields and its kind's draft; only the Feeding form uses `feeds`. Water is a Round: no Form.
-const TABS = {
-  wq: { label: "Water" },
+// One tab per Record kind (lib/validation.ts RECORD_KINDS; the compiler flags a missing one), in tab order. Each form
+// owns its fields and its kind's draft; only the Feeding form uses `feeds`. Water is a Round, not a form.
+const FORMS = {
   feeding: { label: "Feeding", Form: FeedingForm },
   mortality: { label: "Mortality", Form: MortalityForm },
   sampling: { label: "Sampling", Form: SamplingForm },
-} satisfies Record<RecordKind, { label: string; Form?: React.ComponentType<RecordFormProps & { feeds: Feed[] }> }>;
+} satisfies Record<
+  Exclude<RecordKind, "wq">,
+  { label: string; Form: React.ComponentType<RecordFormProps & { feeds: Feed[] }> }
+>;
+const TABS = { wq: { label: "Water" }, ...FORMS } satisfies Record<RecordKind, { label: string }>;
 
 export function Shell({ person, children }: { person?: string; children: React.ReactNode }) {
   return (
@@ -51,7 +54,7 @@ export function Shell({ person, children }: { person?: string; children: React.R
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <Show when="signed-in">
-            <UserButton />
+            <UserButton appearance={{ elements: { userButtonTrigger: "size-11" } }} />
           </Show>
         </div>
       </header>
@@ -97,7 +100,7 @@ export function CollectionApp({
   version: string;
 }) {
   const [chosenPond, setPondCode] = React.useState("");
-  // Only a pond on this Operator's list: a remembered one may since be retired, or another Operator's.
+  // Only a pond on this Operator's list: a remembered one may since be retired, or at a Site they've left.
   const pond = ponds.find((p) => p.pondCode === chosenPond);
   const pondCode = pond?.pondCode ?? "";
   const site = pond?.site;
@@ -105,17 +108,21 @@ export function CollectionApp({
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);
   const [kind, setKind] = React.useState<RecordKind>("wq");
-  // A Round's Past readings: null is off; "" is on with no time, so a later Round can't inherit an old one.
-  const [past, setPast] = React.useState<string | null>(null);
+  const [paperAt, setPaperAt] = React.useState<PaperAt>(null);
   const outbox = useOutbox(account, person);
   React.useEffect(() => {
     let hiddenAt = Infinity;
     const onVisibility = () => {
-      if (document.hidden) hiddenAt = Date.now();
-      else if (Date.now() - hiddenAt > AWAY) setPast((p) => (p === null ? p : ""));
+      if (document.hidden) keepLeftApp((hiddenAt = Date.now()));
+      else setPaperAt((p) => paperAfterAway(p, hiddenAt, new Date()));
     };
+    const onLeave = () => keepLeftApp(Date.now()); // Safari may not say it's hidden when a page reloads
     document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onLeave);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onLeave);
+    };
   }, []);
 
   // Restore after hydration (server has no localStorage), so setState-in-effect is intended.
@@ -123,8 +130,12 @@ export function CollectionApp({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPondCode(readLocal(POND_KEY) ?? "");
     setRecordedAt(readLocal(RECORDED_AT_KEY) ?? "");
+    setPaperAt(restorePaperAt(new Date()));
     setRestored(true);
   }, []);
+  React.useEffect(() => {
+    if (restored) keepPaperAt(paperAt);
+  }, [paperAt, restored]);
   useKeepForOffline(); // the page that opens with no signal is this one, signed in
   const choosePond = React.useCallback((code: string) => {
     setPondCode(code);
@@ -150,42 +161,38 @@ export function CollectionApp({
               </TabsTrigger>
             ))}
           </TabsList>
-          {kind === "wq" ? (
+          <TabsContent value="wq" className="flex flex-col gap-2">
             <FieldGroup className="gap-2 px-1">
               <Field orientation="horizontal" className="min-h-11 items-center">
                 <FieldContent>
-                  <FieldLabel htmlFor="past-readings">Typing from paper</FieldLabel>
+                  <FieldLabel htmlFor="typing-from-paper">Typing from paper</FieldLabel>
                 </FieldContent>
                 <Switch
-                  id="past-readings"
-                  className="after:-inset-y-3.5" // a 44px touch target, as the app's other controls
-                  checked={past !== null}
-                  onCheckedChange={(on) => setPast(on ? "" : null)}
+                  id="typing-from-paper"
+                  checked={paperAt !== null}
+                  onCheckedChange={(on) => setPaperAt(on ? "" : null)}
                 />
               </Field>
-              {past !== null && <RecordedAtField id="past-at" value={past} onChange={setPast} />}
+              {paperAt !== null && <RecordedAtField id="paper-at" value={paperAt} onChange={setPaperAt} />}
             </FieldGroup>
-          ) : (
-            <Card>
-              <CardContent>
-                <FieldGroup className="gap-4">
-                  <Field>
-                    <FieldLabel htmlFor="pond">Pond</FieldLabel>
-                    <PondCombobox id="pond" ponds={ponds} value={pondCode} onChange={choosePond} />
-                  </Field>
-                  <RecordedAtField id="recorded-at" value={recordedAt} onChange={chooseRecordedAt} />
-                  <OutboxAlert outbox={outbox} />
-                </FieldGroup>
-              </CardContent>
-            </Card>
-          )}
-          {Object.entries(TABS).map(([value, tab]) => (
-            <TabsContent key={value} value={value}>
-              {!("Form" in tab) ? (
-                <WaterRound ponds={ponds} past={past} outbox={outbox} onPond={choosePond} />
-              ) : pondCode ? (
+            <WaterRound ponds={ponds} paperAt={paperAt} outbox={outbox} onPond={choosePond} />
+          </TabsContent>
+          {Object.entries(FORMS).map(([value, { Form }]) => (
+            <TabsContent key={value} value={value} className="flex flex-col gap-2">
+              <Card>
+                <CardContent>
+                  <FieldGroup className="gap-4">
+                    <Field>
+                      <FieldLabel htmlFor="pond">Pond</FieldLabel>
+                      <PondCombobox id="pond" ponds={ponds} value={pondCode} onChange={choosePond} />
+                    </Field>
+                    <RecordedAtField id="recorded-at" value={recordedAt} onChange={chooseRecordedAt} />
+                  </FieldGroup>
+                </CardContent>
+              </Card>
+              {pondCode ? (
                 // Keyed by pond: switching ponds remounts the form with that pond's draft.
-                <tab.Form key={pondCode} pondCode={pondCode} recordedAt={when} outbox={outbox} feeds={feedsHere} />
+                <Form key={pondCode} pondCode={pondCode} recordedAt={when} outbox={outbox} feeds={feedsHere} />
               ) : (
                 <Alert>
                   <Info />
@@ -193,6 +200,7 @@ export function CollectionApp({
                   <AlertDescription>Choose a pond above to start recording.</AlertDescription>
                 </Alert>
               )}
+              <OutboxAlert outbox={outbox} />
             </TabsContent>
           ))}
         </Tabs>

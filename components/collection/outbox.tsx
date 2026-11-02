@@ -7,7 +7,6 @@ import { createOutbox, type Sent, type Stopped, type WaitingRecord } from "@/lib
 import type { RecordKind } from "@/lib/validation";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 // One Record to app/api/records; a 401 gets one retry with a fresh Clerk token (the cookie lapses offline).
 async function send({ kind, account, record }: WaitingRecord): Promise<Sent> {
@@ -99,13 +98,13 @@ export const noticeShown = ({ mine, others, sending, stopped }: Outbox) =>
   (mine.length > 0 || others.length > 0) && !(sending && !stopped && !others.length && !mine.some((w) => w.problem));
 
 /** While anything waits: whose Records, why they're not sent yet, and Send now. */
-export function OutboxAlert({ outbox, className }: { outbox: Outbox; className?: string }) {
+export function OutboxAlert({ outbox }: { outbox: Outbox }) {
   const { mine, others, sending, stopped, flush } = outbox;
   if (!noticeShown(outbox)) return null;
 
   return (
     // Wider action slot than the stock pr-18, so "Send now" fits at the 44px touch size.
-    <Alert className={cn("has-data-[slot=alert-action]:pr-28", className)}>
+    <Alert className="has-data-[slot=alert-action]:pr-28">
       <CloudUpload />
       <AlertTitle>{sending ? "Sending…" : `${records(mine.length + others.length)} waiting to send`}</AlertTitle>
       <AlertDescription>

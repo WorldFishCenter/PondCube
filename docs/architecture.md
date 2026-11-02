@@ -178,9 +178,11 @@ The Water tab is a Round (`components/collection/water-round.tsx`), built on the
 A bar with the Pond reached, its two required readings and one button sits over a list of the Area's Ponds. The button
 says Save once something is typed and Skip on an empty Pond. The inputs stay the same elements from Pond to Pond, so
 the keyboard stays up. The button never moves under the thumb: the page scrolls to bring the bar to the top only on a
-tap into it or on a row, and once it's there the list scrolls under it. A Pond's state is one Badge, the same in its
+tap into it or on a row, and once it's there the list scrolls under it. Opening More readings unsticks the bar, so the
+page scrolls back to it and it stays where it was on screen. A Pond's state is one Badge, the same in its
 row and in the bar's confirmation: Saved, Waiting (in the Outbox) or Not saved (a Draft left behind). The Outbox notice
-sits under the bar on this tab, not above it, so it can't move the button when it comes or goes. The bar holds
+sits under the bar here and under the form on the other tabs, as the save messages sit under Save, so neither can move
+the button. The bar holds
 only what changes at each Pond; the Period and date, which don't, head the list.
 
 Number fields, on every tab, are text with a number keypad, not `type="number"`: browsers read that per device and
@@ -188,25 +190,29 @@ region (`1,500` as 1.5 or as nothing, `1,5` as 1.5 or as nothing). `toNumber` in
 typed instead, the same everywhere: a comma is a decimal comma, since some keypads have no point. Only where a field
 allows 1000 or more can `1,500` be thousands, so there it's refused rather than guessed.
 
-There's no new write path: the bar is one record form (`useRecordForm`) on the Pond reached, so each Pond has its
-Draft, and each Save puts one Record in the Outbox, never waiting for the network. A Pond left blank makes no Record. Retyping a Pond that has a reading in this Round makes a Correction: a new Record that names
-the reading it replaces (its mark's id) and keeps its Recorded-at, so it lands in the same cell even past noon. The
+There's no new write path: `createRound` (`lib/round.ts`) takes each tap on Save or Skip and puts the reading through the
+Pond's Draft, so each Pond has its Draft, and each Save puts one Record in the Outbox, never waiting for the network.
+`water-round.tsx` keeps only focus, scroll and rendering, and `scripts/check-round.ts` makes the same taps. A Pond left blank makes no Record. Retyping a Pond that has a reading in this Round makes a Correction: a new Record that names
+the reading it replaces (its mark's id) and keeps its Recorded-at, so it lands in the same cell even past noon. It
+replaces the whole reading, so at validation a field left blank takes that reading's value (`keptFrom`), pH and remarks included: nothing's typed into the form. The
 export leaves the replaced one out, whatever order the two arrive in. The Outbox sends oldest first anyway.
 
 What keeps a reading on its Pond: on a Pond nothing was typed at, Skip works only after it has shown for a second
-(a double tap must not skip a Pond). A Draft that wasn't typed while this Round was on screen (another day, a reload,
-another Operator) needs a second Save. A row tap waits while a save is in progress. The other tabs follow the Pond the
-Round reached. The time set with Typing from paper clears after 30 minutes away from the app, as a phone mostly
-sleeps rather than reloads.
+(a double tap must not skip a Pond). A Draft that wasn't typed while this Round was on screen (another day, a reload)
+needs a second Save. A row tap during a save is ignored. The other tabs follow the Pond the
+Round reached. Typing from paper stays on through a reload or the browser closing the page, so those readings can't
+take the current time; its time clears after 30 minutes away from the app, so a later Round can't inherit it.
 
-`lib/round.ts` keeps how far the Round got on the device, per day and Period (today's and yesterday's only, so it can't
-fill the storage the Outbox needs). These marks are only for showing: nothing about saving depends on them,
-and two Operators on one Round don't see each other's. A Round stays the same one while readings keep coming (30
+`lib/round.ts` keeps how far the Round got on the device, per day and Period (today's and yesterday's only, so
+it can't fill the storage the Outbox needs). These marks never decide whether a Record is saved or sent; a Correction
+reads from them what it replaces and keeps. A Round stays the same one while readings keep coming (30
 minutes apart at most), so its marks don't vanish if it runs past noon. The Period itself still follows each reading's
 hour, as everywhere else, so readings after noon are afternoon ones. That's still to be confirmed with the Operators
-(when does a round run?); if rounds do run past noon, it's `periodAt` and the `PERIOD` of `export_wq`.
+(when does a round run?); if rounds do run past noon, it's `periodAt` and the `PERIOD` of `export_wq`. It also means a new
+walk begun within those 30 minutes is still the old Round, so retyping a Pond there corrects its earlier reading.
 
-Tested in a desktop browser at phone size, not yet on a real iPhone: there, check that the keyboard stays up on Save.
+Tested in Chromium and WebKit at phone size, and on a real iPhone so far only for the number keypad: there, still check
+that the keyboard stays up on Save.
 
 ### Saving without signal (the Outbox)
 
@@ -221,11 +227,12 @@ URL rather than a server action because an action's id changes with every deploy
 a device can hold Records across one.
 
 - **Resends are safe.** Intake skips any row whose id is already stored, so a reply
-  lost on a weak signal never leads to a duplicate Record or Fish measurement.
+  lost on a weak signal never leads to a duplicate Record or Fish measurement. That holds with no room on the device
+  too: the Draft stays, and saving the same values again sends the same ids (kept in memory, so not past a reload).
 - **Who sends it.** Each Record carries the sign-in account that saved it (Clerk user
   id, so renaming the Operator in Airtable doesn't strand it). The device sends only
   that account's Records, and the route refuses any other (401), so nothing is ever
-  stored under someone else's name on a shared device.
+  stored under someone else's name.
 - **Sign-in.** A 401 gets one retry with a fresh Clerk token. If that fails (signed
   out, a stale page, or Clerk never loaded because the app opened offline), the notice
   asks to tap "Send now", which reloads the page. A 403 (no longer on the operator

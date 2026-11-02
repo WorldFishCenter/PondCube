@@ -1,4 +1,4 @@
-// Device storage (Drafts, the Outbox, remembered choices). It can throw, so every call is guarded.
+// Device storage (Drafts, the Outbox, Round marks, remembered choices). It can throw, so every call is guarded.
 
 /** The seam to storage. Adapters: browserStorage (the app), a Map (scripts/fake-storage.ts). */
 export type KeyValueStorage = {

@@ -1,12 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useForm, type DefaultValues, type FieldValues } from "react-hook-form";
+import { useForm, type DefaultValues, type FieldValues, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { format, parse } from "date-fns";
-import { AlertCircle, CheckCircle2, ChevronDownIcon, CloudUpload, Pencil, type LucideIcon } from "lucide-react";
-import { createDraft, type Submitted } from "@/lib/draft";
+import { CheckCircle2, ChevronDownIcon, CloudUpload, Pencil, type LucideIcon } from "lucide-react";
+import { createDraft, type Draft, type NotSaved } from "@/lib/draft";
 import type { RECORD_KINDS, RecordKind } from "@/lib/validation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import type { Outbox } from "./outbox";
 
-type Result = { ok: boolean; title: string; msg: string; Icon: LucideIcon } | null;
+type Result = { ok: boolean; word: string; msg: string; Icon: LucideIcon } | null;
 type Message = { message?: string } | undefined;
 
 // The selected tab is filled with the primary colour. Stock Tabs has no filled variant,
@@ -55,18 +55,37 @@ export function StatusBadge({
   );
 }
 
-/** Recorded-at: local "YYYY-MM-DDTHH:mm", "" until set. `clear` runs after a save, where each Record sets its own. */
-export type RecordedAt = { value: string; clear?: () => void };
+/** Recorded-at: local "YYYY-MM-DDTHH:mm", "" until set. `clear` runs after a save: each Record sets its own. */
+export type RecordedAt = { value: string; clear: () => void };
 /** What every record form gets from the app shell. */
 export type RecordFormProps = { pondCode: string; recordedAt: RecordedAt; outbox: Outbox };
 
-type Submission = { id: string; msg: string } | Exclude<Submitted, "kept"> | null;
-const NOT_SAVED: Record<Exclude<Submitted, "kept">, string> = {
+type Submission = { id: string; msg: string } | NotSaved | null;
+const NOT_SAVED: Record<NotSaved, string> = {
   noRecordedAt: "Set the date & time at the top before saving.",
   futureRecordedAt: "The date & time at the top is later than now: correct it before saving.",
   notKept:
     "This device has no room to keep it and it couldn't be sent. Your entry is still here: try again with signal.",
 };
+
+// A form on a Draft: shows it on mount and on a change of Draft (tabs unmount inactive forms; a Round's form stays), and
+// keeps each edit in it. `blank` must be module-level.
+export function useDraftForm<TValues extends FieldValues, TRecord = TValues>(
+  draft: Pick<Draft, "restore" | "change" | "muted">,
+  blank: () => TValues, // empty number fields are "": reset() with undefined leaves inputs filled
+  resolver?: Resolver<TValues, unknown, TRecord>,
+) {
+  const form = useForm<TValues, unknown, TRecord>({ resolver, defaultValues: blank() as DefaultValues<TValues> });
+  const { reset, watch } = form;
+  React.useEffect(() => {
+    draft.muted(() => reset({ ...blank(), ...draft.restore() } as TValues));
+  }, [draft, reset, blank]);
+  React.useEffect(() => {
+    const sub = watch((values) => draft.change(values));
+    return () => sub.unsubscribe();
+  }, [draft, watch]);
+  return form;
+}
 
 // A record form on this pond's Draft (lib/draft.ts); Save hands it to the Outbox. `blank` must be module-level.
 export function useRecordForm<K extends RecordKind, TValues extends FieldValues, TRecord extends { id: string }>({
@@ -77,68 +96,58 @@ export function useRecordForm<K extends RecordKind, TValues extends FieldValues,
   pondCode,
   recordedAt,
   outbox,
-  onSaved,
 }: RecordFormProps & {
   kind: K;
   schema: z.ZodType<TRecord, TValues> & (typeof RECORD_KINDS)[K]["form"]; // must be this kind's form schema
-  blank: (last?: TRecord) => TValues; // empty number fields are "": reset() with undefined leaves inputs filled
+  blank: (last?: TRecord) => TValues;
   savedMessage: (record: TRecord) => string;
-  onSaved?: (record: TRecord) => void;
 }) {
   const [submitted, setSubmitted] = React.useState<Submission>(null);
-  const form = useForm<TValues, unknown, TRecord>({
-    resolver: zodResolver<TValues, unknown, TRecord>(schema),
-    defaultValues: blank() as DefaultValues<TValues>,
-  });
-  const { reset, watch, handleSubmit, formState } = form;
   const { add } = outbox; // stable across renders, unlike the outbox object
   const draft = React.useMemo(
     () => createDraft<TValues, TRecord>(kind, pondCode, (record) => add(kind, { ...record, pondCode })),
     [kind, pondCode, add],
   );
+  const form = useDraftForm(draft, blank, zodResolver<TValues, unknown, TRecord>(schema));
+  const { reset, handleSubmit, formState } = form;
 
-  // Show this pond's draft on mount (tabs unmount inactive forms; the shell remounts forms per pond).
-  React.useEffect(() => {
-    draft.muted(() => reset({ ...blank(), ...draft.restore() } as TValues));
-  }, [draft, reset, blank]);
-  React.useEffect(() => {
-    const sub = watch((values) => draft.change(values));
-    return () => sub.unsubscribe();
-  }, [draft, watch]);
-
-  const onSubmit = handleSubmit(async (record) => {
+  const onSubmit = handleSubmit(async (parsed) => {
     setSubmitted(null);
-    const outcome = await draft.submit(record, recordedAt.value);
-    if (outcome !== "kept") {
-      setSubmitted(outcome);
+    const record = await draft.submit(parsed, recordedAt.value);
+    if (typeof record === "string") {
+      setSubmitted(record);
       return;
     }
     draft.muted(() => reset(blank(record)));
-    recordedAt.clear?.();
+    recordedAt.clear();
     setSubmitted({ id: record.id, msg: savedMessage(record) });
-    onSaved?.(record);
   });
-  const clearResult = React.useCallback(() => setSubmitted(null), []);
 
   const result = resultOf(submitted, outbox);
-  return { form, card: { onSubmit, result, pending: formState.isSubmitting }, clearResult };
+  return { form, card: { onSubmit, result, pending: formState.isSubmitting } };
 }
+
+/** The message when a Record couldn't be saved; what's typed stays. */
+export const notSaved = (outcome: NotSaved): NonNullable<Result> => ({
+  ok: false,
+  ...STATUS.typed,
+  msg: NOT_SAVED[outcome],
+});
 
 // The form's message follows the Record until the server has it.
 function resultOf(submitted: Submission, { isWaiting, sending }: Outbox): Result {
   if (!submitted) return null;
-  if (typeof submitted === "string")
-    return { ok: false, title: "Not saved", msg: NOT_SAVED[submitted], Icon: AlertCircle };
-  if (!isWaiting(submitted.id)) return { ok: true, title: "Saved", msg: submitted.msg, Icon: STATUS.saved.Icon };
-  const next = sending ? "Sending…" : "It will be sent when there's signal.";
-  return { ok: true, title: "Saved on this device", msg: `${submitted.msg} ${next}`, Icon: STATUS.waiting.Icon };
+  if (typeof submitted === "string") return notSaved(submitted);
+  if (!isWaiting(submitted.id)) return { ok: true, ...STATUS.saved, msg: submitted.msg };
+  const next = sending ? "Sending…" : "Kept on this device until there's signal.";
+  return { ok: true, ...STATUS.waiting, word: `${STATUS.waiting.word} to send`, msg: `${submitted.msg} ${next}` };
 }
 
 export function ResultAlert({ result }: { result: NonNullable<Result> }) {
   return (
     <Alert variant={result.ok ? "default" : "destructive"}>
       <result.Icon />
-      <AlertTitle>{result.title}</AlertTitle>
+      <AlertTitle>{result.word}</AlertTitle>
       <AlertDescription>{result.msg}</AlertDescription>
     </Alert>
   );
@@ -170,12 +179,13 @@ export function RecordCard({
           </FieldSet>
         </form>
       </CardContent>
+      {/* The message below Save, so Save doesn't move when it comes. */}
       <CardFooter className="flex-col gap-4">
-        {result ? <ResultAlert result={result} /> : null}
         <Button type="submit" form={id} className="w-full" disabled={pending}>
           {pending && <Spinner data-icon="inline-start" />}
           {saveLabel}
         </Button>
+        {result ? <ResultAlert result={result} /> : null}
       </CardFooter>
     </Card>
   );
@@ -250,15 +260,27 @@ export function NumberField({
   label,
   hint,
   error,
+  hideError = false,
   integer = false,
   ...input
-}: React.ComponentProps<"input"> & { id: string; label: string; hint?: string; error?: Message; integer?: boolean }) {
+}: React.ComponentProps<"input"> & {
+  id: string;
+  label: string;
+  hint?: string;
+  error?: Message;
+  hideError?: boolean; // the caller shows it elsewhere
+  integer?: boolean;
+}) {
   return (
     <Field data-invalid={!!error}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {/* Text with a number keypad, not type="number": browsers read that per device ("1,500" as 1.5, or as nothing). */}
       <Input id={id} inputMode={integer ? "numeric" : "decimal"} autoComplete="off" aria-invalid={!!error} {...input} />
-      {error ? <FieldError errors={[error]} /> : hint ? <FieldDescription>{hint}</FieldDescription> : null}
+      {error && !hideError ? (
+        <FieldError errors={[error]} />
+      ) : hint ? (
+        <FieldDescription>{hint}</FieldDescription>
+      ) : null}
     </Field>
   );
 }
