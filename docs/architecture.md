@@ -38,7 +38,7 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
   as the DMS's `pond_treat`). Pond codes follow the DMS (`TAL_01`: site, then the pond's number); Penang's
   `PEN-FT3-091` stays until it's renumbered, and only Penang fills `area_code` and `zone`.
 - **`feed`** — the DMS feed list (`feed`, three characters; `note_feed`) with the `sites` that use
-  it, mirroring the Airtable `feeds` table. A Feeding event's `feed` points to one; the form offers
+  it, mirroring the Airtable `feeds` table. A Feeding event's `feed` (required) points to one; the form offers
   the feeds of the chosen pond's site, and the records route refuses any other.
 - **`species`** — the DMS species list (`species` two-letter code, `species_latin`, `species_common`),
   mirroring the Airtable `species` table. In Airtable a pond's species are links to that table; the
@@ -48,7 +48,8 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
   to each record as its `person`.
 - **`wq_readings`, `feeding_events`, `mortality_events`** — flat event tables. A water-quality Correction names
   the reading of its pond it replaces in `replaces` (no foreign key: that reading may reach the server later, or be
-  refused); `export_wq` leaves replaced readings out.
+  refused); `export_wq` leaves replaced readings out. A Feeding event is one `feed` and its `feed_weight` in grams,
+  as the pond book's daily FEED n TYPE / FEED n WEIGHT (g): the DMS has no daily feed table.
 - **`app_version`** on every record table (fish measurements inherit it from their sampling
   event): the app version that saved it, set on the server by record intake, or `legacy` for the
   imported Excel log. Use it to trace records to the code and rules that accepted them.
@@ -446,3 +447,11 @@ npm run dev         # http://localhost:3000
    psql "$DATABASE_URL_PROD" -c 'DROP VIEW IF EXISTS export_wq'
    DATABASE_URL="$DATABASE_URL_PROD" npx drizzle-kit push
    ```
+7. From 0.11.0 to 0.12.0 (Bangladesh): `scripts/migrate-0.12.0.sql` (a pond's species become a list; applied to dev
+   and production on 2026-11-06, don't re-run it), then `scripts/migrate-0.12.0-feeding.sql` (a Feeding event is one
+   Feed and its grams). The feeding one stops on a `feeding_events` with rows, rather than read kilograms as grams;
+   none had any. Each drops views, so run it in one transaction with those views recreated as push makes them
+   (drizzle-kit's `generateMigration`), and no view is ever missing; push then has nothing left but a harmless
+   `SET DEFAULT '{}'` on `pond.species`. The feeding one was applied to dev and production on 2026-11-06. From then on, an
+   app older than 0.12.0 can't store a Feeding event: it waits on the phone and sends once that phone has 0.12.0,
+   which reads it as grams.

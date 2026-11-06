@@ -82,6 +82,7 @@ scripts/import-legacy.ts  One-off: legacy Excel log (converted CSV) → wq_readi
 scripts/migrate-0.8.0.sql One-off: production from 0.7.0 to 0.8.0 (DMS v3 renames, values kept); see docs/architecture.md
 scripts/migrate-0.10.0.sql One-off: each site's timezone and a changed view, before push (0.9.0 → 0.10.0)
 scripts/migrate-0.12.0.sql One-off: a pond's species become a list; area_code, zone optional; before push (0.11.0 → 0.12.0)
+scripts/migrate-0.12.0-feeding.sql One-off, after it: a Feeding event is one Feed + grams (feed_weight), no feedings count
 scripts/check-*.ts        The self-checks run by `npm run check` (fake-storage.ts: their storage adapters; xlsx-dump.py: openpyxl)
 ```
 
@@ -177,3 +178,14 @@ Operators are edited there too, with the `email` they sign in with (`active` unt
 = can't sign in).
 Sensor (Mandible) data will land in the same database later, joined on
 `pond_code` + timestamp. Full detail and setup/deploy steps: `docs/architecture.md`.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

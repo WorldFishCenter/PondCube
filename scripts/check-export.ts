@@ -29,6 +29,7 @@ async function main() {
     unitType: "tank",
   });
   await db.insert(schema.pond).values([pond("PEN-FT1-001", "PEN", "Fish Tank 1"), pond("TAL_07", "TAL", "Pond")]);
+  await db.insert(schema.feed).values({ feed: "SUP", sites: ["PEN", "TAL"] });
   // Every Record kind at both sites.
   for (const [pondCode, recordedAt] of [
     ["PEN-FT1-001", new Date("2026-10-29T17:30:00Z")], // 01:30 on 30 October in Penang
@@ -36,7 +37,7 @@ async function main() {
   ] as const) {
     const at = { pondCode, recordedAt, person: "Ana", appVersion: "0.10.0" };
     await db.insert(schema.wqReadings).values({ ...at, period: "morning", dissolvedOxygen: 6.5, temperature: 29 });
-    await db.insert(schema.feedingEvents).values({ ...at, feedAmountKg: 2 });
+    await db.insert(schema.feedingEvents).values({ ...at, feed: "SUP", feedWeight: 2000 });
     await db.insert(schema.mortalityEvents).values({ ...at, mortalityCount: 3, causeDeath: "Unknown" });
     const [event] = await db.insert(schema.samplingEvents).values(at).returning();
     await db.insert(schema.fishMeasurements).values([

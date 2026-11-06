@@ -85,8 +85,9 @@ each Site has its own list.
 _Avoid_: feed type
 
 **Feeding event**
-An amount of feed given to a Pond, optionally with the Feed used and number of feedings.
-_Avoid_: feed log
+One Feed given to a Pond and its weight in grams (over 0, up to 15,000 g), as the pond book records each feed of a
+day. Two Feeds the same day are two Feeding events.
+_Avoid_: feed log, amount fed
 
 **Mortality record**
 A count of dead fish removed from a Pond, optionally with a cause of death (one of the DMS's eleven).

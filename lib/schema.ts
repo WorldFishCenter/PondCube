@@ -111,9 +111,11 @@ export const feedingEvents = pgTable("feeding_events", {
     .notNull()
     .references(() => pond.pondCode),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
-  feed: text("feed").references(() => feed.feed),
-  feedAmountKg: doublePrecision("feed_amount_kg"),
-  feedingsCount: integer("feedings_count"),
+  // One Feed given that day, as the pond book records it (up to 3 a day, each its own Record)
+  feed: text("feed")
+    .notNull()
+    .references(() => feed.feed),
+  feedWeight: doublePrecision("feed_weight").notNull(), // g
   remarks: text("remarks"),
   person: text("person").notNull(),
   appVersion: text("app_version").notNull(), // app version that saved it; "legacy" = imported log
@@ -180,8 +182,7 @@ export const PROVISIONAL = {
   nitrite: "nitrite",
   nitrate: "nitrate",
   remarks: "remarks",
-  feed_amount_kg: "feed_amount_kg",
-  feedings_count: "feedings_count",
+  feed_weight: "feed_weight", // g; the pond book's FEED n WEIGHT
   mortality_count: "mortality_count",
   sampling_event: "sampling_event", // the Sampling event's id, shared by its Fish measurements
   notes: "notes",
@@ -277,8 +278,7 @@ export const feedingView = pgView("export_feeding").as((qb) =>
           ...recordFields(feedingEvents),
           ...pondFields,
           feed: feedingEvents.feed,
-          [P.feed_amount_kg]: feedingEvents.feedAmountKg,
-          [P.feedings_count]: feedingEvents.feedingsCount,
+          [P.feed_weight]: feedingEvents.feedWeight,
           [P.remarks]: feedingEvents.remarks,
           ...madeBy(feedingEvents),
         }),
