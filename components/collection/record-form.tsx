@@ -305,7 +305,7 @@ export function NotesField({ id, ...textarea }: React.ComponentProps<"textarea">
   );
 }
 
-// An optional pick from a list, per Base UI Select: the null item is the placeholder and clears the choice.
+// A pick from a list, per Base UI Select: the null item is the placeholder and clears the choice.
 export function SelectField({
   id,
   label,
@@ -313,6 +313,8 @@ export function SelectField({
   options,
   value,
   onChange,
+  required = false,
+  error,
 }: {
   id: string;
   label: string;
@@ -320,17 +322,20 @@ export function SelectField({
   options: readonly { value: string; label: string }[];
   value: string | undefined;
   onChange: (value: string | undefined) => void;
+  required?: boolean;
+  error?: Message;
 }) {
   return (
-    <Field>
+    <Field data-invalid={!!error}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Choice
         id={id}
         items={[{ value: null, label: placeholder }, ...options]}
-        value={value ?? null}
+        value={value || null}
         onChange={(v) => onChange(v ?? undefined)}
+        invalid={!!error}
       />
-      <FieldDescription>Optional.</FieldDescription>
+      {error ? <FieldError errors={[error]} /> : required ? null : <FieldDescription>Optional.</FieldDescription>}
     </Field>
   );
 }
@@ -341,15 +346,17 @@ export function Choice({
   items,
   value,
   onChange,
+  invalid = false,
 }: {
   id: string;
   items: readonly { value: string | null; label: string }[];
   value: string | null;
   onChange: (value: string | null) => void;
+  invalid?: boolean;
 }) {
   return (
     <Select items={items} value={value} onValueChange={onChange}>
-      <SelectTrigger id={id}>
+      <SelectTrigger id={id} aria-invalid={invalid}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

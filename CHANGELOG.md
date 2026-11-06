@@ -4,6 +4,15 @@ What changed in each version of PondCube Collect. Versions follow
 [semantic versioning](https://semver.org): big changes raise the first number, new
 features the second, fixes the third.
 
+## [0.12.0] - 2026-11-06
+
+### Changed
+
+- Feeding now follows the pond book, at every site: one record for each feed given, with the feed and its weight in grams. If a pond gets two feeds in a day, save two records. The feed is now required, chosen from your site's list. "Amount fed (kg)" and "Number of feedings" are gone.
+- A feed weight must be more than 0 g and at most 15,000 g, the pond book's limit for one feed on one day.
+- Feeding records typed or saved on your phone before this update are not lost. Their amount is turned from kilograms into grams, and the number of feedings is added to their remarks. If one being filled in has no feed, pick one before saving.
+- Data links: the feeding file's columns change. FEED_AMOUNT_KG and FEEDINGS_COUNT are replaced by FEED_WEIGHT, in grams. A spreadsheet built on the old feeding columns stops working until its feeding query is set up again.
+
 ## [0.11.0] - 2026-11-01
 
 ### Changed

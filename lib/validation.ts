@@ -25,6 +25,7 @@ export const RANGES = {
   nitrate: [0, 500],
   wt: [0, 20000], // DMS trait WT, g (Range from the v3 trait table)
   lenSt: [0, 100], // DMS v5 trait LEN_ST, cm
+  feedWeight: [0, 15000], // g of one Feed per day: the 2025 pond book's bound
 } as const;
 
 // Optional decimal. int: counts map to integer DB columns, so reject decimals here rather than at insert.
@@ -97,9 +98,11 @@ export const waterQualitySchema = waterQualityForm.extend(forSave);
 
 export const feedingForm = z.object({
   id: madeAtSave(),
-  feed: z.string().optional(), // a feed of the pond's site: refusal() in lib/operators.ts checks that
-  feedAmountKg: reqNum(0, 100000, "Amount fed (kg)"),
-  feedingsCount: optNum(0, 100, true),
+  feed: z.string({ error: "Select a feed" }).min(1, "Select a feed"), // of the pond's site: refusal() checks that
+  feedWeight: reqNum(...RANGES.feedWeight, "Feed weight (g)").refine(
+    (v) => v !== 0,
+    "Feed weight (g) must be more than 0",
+  ),
   remarks: note,
 });
 export const feedingSchema = feedingForm.extend(forSave);
@@ -140,6 +143,7 @@ export type RecordKind = keyof typeof RECORD_KINDS;
 
 // Drafts and Outbox Records saved before 0.8.0 carry the fields' earlier names: read them under the DMS v5 ones.
 // A value with no new field (an old feed type, an old cause the DMS lacks) goes in the note, as in the database.
+// Feeding before 0.12.0 was kg per feeding with a number of feedings: now g per Feed, the number in the remarks.
 const OLD_CAUSES: Record<string, string> = {
   disease: "Disease_parasites",
   handling: "Handling_mortality",
@@ -147,15 +151,30 @@ const OLD_CAUSES: Record<string, string> = {
   unknown: "Unknown",
 };
 const joinNotes = (...notes: unknown[]) => notes.filter(Boolean).join("; ");
+// A Draft holds typed text, an Outbox Record a number; blank or unreadable text stays as typed.
+const kgToGrams = (kg: unknown) => {
+  const n = toNumber(Infinity)(kg);
+  if (typeof n !== "number" || Number.isNaN(n)) return kg;
+  const g = Math.round(n * 1e6) / 1e3; // 2.3 * 1000 is 2299.9999999999995
+  return typeof kg === "string" ? String(g) : g;
+};
 export function withNewNames(kind: string, fields: Record<string, unknown>): Record<string, unknown> {
   if (kind === "mortality" && ("suspectedCause" in fields || "remarks" in fields)) {
     const { suspectedCause: cause, remarks, ...rest } = fields;
     const causeDeath = OLD_CAUSES[String(cause)];
     return { ...rest, causeDeath, noteDeath: joinNotes(remarks, cause && !causeDeath && `Cause: ${cause}`) };
   }
-  if (kind === "feeding" && ("feedType" in fields || "feedTypeOther" in fields)) {
-    const { feedType: type, feedTypeOther: other, ...rest } = fields;
-    return { ...rest, remarks: joinNotes(rest.remarks, type && `Feed type: ${(type === "other" && other) || type}`) };
+  if (kind === "feeding" && ["feedType", "feedTypeOther", "feedAmountKg", "feedingsCount"].some((f) => f in fields)) {
+    const { feedType: type, feedTypeOther: other, feedAmountKg: kg, feedingsCount: count, ...rest } = fields;
+    return {
+      ...rest,
+      ...(kg !== undefined && { feedWeight: kgToGrams(kg) }),
+      remarks: joinNotes(
+        rest.remarks,
+        type && `Feed type: ${(type === "other" && other) || type}`,
+        (count ?? "") !== "" && `Number of feedings: ${count}`,
+      ),
+    };
   }
   if (kind === "sampling" && Array.isArray(fields.fish))
     return {

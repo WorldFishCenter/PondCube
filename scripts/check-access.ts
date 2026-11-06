@@ -54,7 +54,7 @@ async function main() {
   assert.equal(await refused({ pondCode: "KOT-PND-001" }), "Pond KOT-PND-001 isn't at your site");
   assert.equal(await refused({ pondCode: "PEN-XXX-999" }), "Pond PEN-XXX-999 isn't at your site");
   assert.equal(await refused({ pondCode: "PEN-FT1-001", feed: "SUP" }), null);
-  assert.equal(await refused({ pondCode: "PEN-FT1-001" }), null, "the feed is optional");
+  assert.equal(await refused({ pondCode: "PEN-FT1-001" }), null, "other Record kinds have no feed");
   assert.equal(await refused({ pondCode: "PEN-FT1-001", feed: "XYZ" }), "Feed XYZ isn't used at this pond's site");
   assert.equal(
     await refused({ pondCode: "PEN-FT1-001", feed: "NAT" }),

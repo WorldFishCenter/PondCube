@@ -118,6 +118,11 @@ The app shows the standard names in plain words, not capitals and underscores (e
 **Decided on our side**: names are lowercase in Neon and Airtable (`lat_pond`), because Postgres folds unquoted names
 to lowercase. Q2 asks Matt whether that counts as the same name.
 
+**Changed on 2026-11-06 (version 0.12.0)**: a Feeding event follows the pond book at every site: one Feed (now
+required) and its weight in grams, `feed_weight` (was `feed_amount_kg`, kg), over 0 and up to 15 000 g; the number of
+feedings is gone (see 2.5). No Feeding event was stored on dev or production, so nothing was converted. Drafts and
+Outbox Records saved before it are read in grams, with their number of feedings in the remarks.
+
 **Waiting for Matt**: the rest of this document. First the site code and the pond numbers (Q3, Q4). Then the Record
 fields and their values. Each further rename also needs Records still waiting on devices read under the new names, as
 was done for this one.
@@ -136,8 +141,8 @@ was done for this one.
   Fish Tanks 1–3 share one run (1–210), but Hatchery, Block L, Aqua, Water Storage and Pond each restart at 1. So 86
   ponds need new numbers (Q4).
 - No Record of ours carries a **species**. In the standard, every death, transfer and sample row does.
-- Values that differ: Period (morning/afternoon vs morning/midday/afternoon), feed (kg per feeding vs grams per feed
-  product per day). Mortality causes now match the DMS's eleven.
+- Values that differ: Period (morning/afternoon vs morning/midday/afternoon). Feed matches the pond book since 0.12.0:
+  grams per feed. Mortality causes now match the DMS's eleven.
 - The two sources disagree with each other on a few points: pond area unit, species value, one death cause, pond
   category, header spelling. The DMS wins (Q1).
 - The standard records things we don't yet: fish transfers, water transfers, fertiliser, treatments, Secchi disc and
@@ -269,7 +274,7 @@ Match: **same** (name and meaning agree), **rename** (same meaning, different na
 | Record / Record kind          | Load file / pond book section                      | none   | App concepts                                                 |
 | Water-quality reading         | Water chemistry                                    | rename |                                                              |
 | Period                        | MORNING / MIDDAY / AFTERNOON                       | recode | Q8                                                           |
-| Feeding event                 | Feed                                               | rename | Different shape, 2.5                                         |
+| Feeding event                 | Feed                                               | rename | One feed per Record, as in the pond book, 2.5                |
 | Mortality record              | Fish death (summary row)                           | rename |                                                              |
 | Sampling event                | Random sample (pond book); measurement event (DMS) | rename | Exported as `MEASURE_EVENT` `MONITOR` (v5); Q11              |
 | Fish measurement              | Trait values `WT`, `LEN_ST`                        | rename |                                                              |
@@ -326,15 +331,18 @@ Match: **same** (name and meaning agree), **rename** (same meaning, different na
 
 ### 2.5 Feeding event (`feeding_events`) → feed
 
-The shapes differ. The pond book records, per pond per day, up to three feed products, each with its weight in grams.
-We record one feeding at a time in kilograms, with a Feed from the site's list and a number of feedings.
+The DMS has no daily feed table. The pond book records, per pond per day, up to three feeds, each a type and its weight
+in grams; feed is Talbaria's daily routine (6,287 pond-days in 2025). Since 0.12.0 (decided 2026-11-06, every site) a
+Feeding event is one of those feeds: its Pond, its Feed (required) and its weight in grams. Three feeds on a day are
+three Feeding events. Each sets its own Recorded-at above the form, as before.
 
-| Ours                     | Standard          | Match | Note                                                  |
-| ------------------------ | ----------------- | ----- | ----------------------------------------------------- |
-| `feed` (was `feed_type`) | `FEED`            | done  | Each site's list, in Airtable; product lists? Q9      |
-| (was `feed_type_other`)  | —                 | done  | Removed; old values kept in `remarks`                 |
-| `feed_amount_kg`         | `FEED WEIGHT` (g) | unit  | kg → g                                                |
-| `feedings_count`         | —                 | none  | The regime's `FREQUENCY` is days between applications |
+| Ours                                 | Standard               | Match | Note                                                                         |
+| ------------------------------------ | ---------------------- | ----- | ---------------------------------------------------------------------------- |
+| `feed` (was `feed_type`)             | `FEED` / `FEED n TYPE` | done  | Required; each site's list, in Airtable; product lists? Q9                   |
+| (was `feed_type_other`)              | —                      | done  | Removed; old values kept in `remarks`                                        |
+| `feed_weight` (was `feed_amount_kg`) | `FEED n WEIGHT` (g)    | done  | Grams, over 0 up to 15,000 (the pond book's bound); `FEED_WEIGHT` in exports |
+| (was `feedings_count`)               | —                      | done  | Removed; on devices, an old number goes in `remarks`                         |
+| `remarks`                            | `REMARKS`              | same  |                                                                              |
 
 ### 2.6 Mortality record (`mortality_events`) → fish death
 
@@ -374,7 +382,7 @@ keeps individual values per tagged fish.
 | pH               | 0–14                             | 0–14                           | —                    |
 | Ammonia          | 0–100 mg/l                       | 0–50                           | —                    |
 | Nitrite, nitrate | 0–100, 0–500 mg/l                | —                              | —                    |
-| Feed             | 0–100 000 kg per feeding         | 0–15 000 g per product per day | —                    |
+| Feed             | over 0, up to 15 000 g per feed  | 0–15 000 g per product per day | —                    |
 | Fish weight      | over 0, up to 20 000 g           | mean 0–15 000 g                | `WT` 0–20 000 g (v3) |
 | Fish length      | over 0, up to 100 cm (standard)  | —                              | `LEN_ST` 0–100 cm    |
 | Dead fish count  | 0–1 000 000                      | —                              | —                    |
@@ -390,7 +398,7 @@ The bounds differ but nothing conflicts by name. Q8 asks whether program-wide Ra
 | Tab         | Water quality                                   | WATER CHEMISTRY                                  |
 | Readings    | Oxygen (mg/L), Temperature, pH, Ammonia (mg/L)  | DISOLVED OXYGEN, TEMPERATURE, pH, AMMONIA (mg/l) |
 | Tab         | Feeding                                         | FEED                                             |
-| Feed        | Feed; Amount fed (kg); Number of feedings       | FEED TYPE; FEED WEIGHT (g)                       |
+| Feed        | Feed; Feed weight (g)                           | FEED TYPE; FEED WEIGHT (g)                       |
 | Tab         | Mortality                                       | FISH DEATH                                       |
 | Deaths      | Number of dead fish; Cause of death; Remarks    | COUNT_DEAD; CAUSE OF DEATH; REMARKS              |
 | Tab         | Sampling                                        | RANDOM SAMPLE                                    |
@@ -413,9 +421,8 @@ Each item names the question it waits on.
    exported as `DATE` + `TIME`.
 4. **Water chemistry** (Q8): table `wq_readings` → `water_chemistry`; Period values → `MORNING` / `AFTERNOON` (+
    `MIDDAY`). Reading names stay; keep the correct spelling "dissolved".
-5. **Feed** (Q9): `feed_type` → `feed` from each site's list, and `feed_type_other` removed: done (see Status). Open:
-   `feed_amount_kg` → `feed_weight` in g. Table name: the DMS already uses `FEED` for its feed codes, so `feed_event`
-   rather than `feed`.
+5. **Feed** (Q9): `feed_type` → `feed` from each site's list, `feed_type_other` removed, and `feed_amount_kg` →
+   `feed_weight` in g: done (see Status and 2.5). The table stays `feeding_events`.
 6. **Fish death** (Q10): `cause_death`, its values and `note_death` done (see Status). Open: table
    `mortality_events` → `fish_death`; `mortality_count` → `count_dead`; add `species`.
 7. **Sampling** (Q11): `wt`, `len_st` and the `MONITOR` event done (see Status). Open: add `species`.
@@ -445,7 +452,7 @@ Each item names the question it waits on.
 
 ## 5. What we record that the standard doesn't
 
-Nitrite and nitrate; number of feedings; area, zone, unit type, volume, depth, water
+Nitrite and nitrate; area, zone, unit type, volume, depth, water
 source, status and commissioning date of a pond; the legacy location and tank ID; the exact instant of a Record with its
 time zone; who saved it (sign-in account) and with which app version. Q14 asks which of these stay and under what names.
 
@@ -493,6 +500,8 @@ Each question has our proposal so a yes is enough.
 
 9. Record feed per product per day in grams, as the pond book does, instead of per feeding in kilograms? Is the feed
    product list global or per country (the current one has Bangladesh brands)? Are `NAT` / `SUP` still used?
+   **Decided on our side (2026-11-06): grams per feed, as the pond book** (2.5). The lists stay open: Penang's has
+   only `NAT` / `SUP`, the DMS's examples.
 
 **Deaths**
 

@@ -2,13 +2,12 @@
 
 import { Controller } from "react-hook-form";
 import { feedingForm } from "@/lib/validation";
-import { FieldGroup } from "@/components/ui/field";
 import { NotesField, NumberField, RecordCard, SelectField, type RecordFormProps, useRecordForm } from "./record-form";
 
 /** A feed used at the chosen pond's site (DMS FEED). */
 export type Feed = { feed: string; noteFeed: string | null };
 
-const blank = () => ({ feed: undefined, feedAmountKg: "", feedingsCount: "", remarks: "" });
+const blank = () => ({ feed: "", feedWeight: "", remarks: "" });
 
 export function FeedingForm({ feeds, ...props }: RecordFormProps & { feeds: Feed[] }) {
   const { form, card } = useRecordForm({
@@ -37,20 +36,12 @@ export function FeedingForm({ feeds, ...props }: RecordFormProps & { feeds: Feed
             options={feeds.map((f) => ({ value: f.feed, label: f.noteFeed ? `${f.feed} · ${f.noteFeed}` : f.feed }))}
             value={field.value}
             onChange={field.onChange}
+            required
+            error={errors.feed}
           />
         )}
       />
-      <FieldGroup className="grid grid-cols-2 gap-4">
-        <NumberField id="fd-a" label="Amount fed (kg)" error={errors.feedAmountKg} {...register("feedAmountKg")} />
-        <NumberField
-          id="fd-n"
-          label="Number of feedings"
-          hint="Optional."
-          integer
-          error={errors.feedingsCount}
-          {...register("feedingsCount")}
-        />
-      </FieldGroup>
+      <NumberField id="fd-w" label="Feed weight (g)" error={errors.feedWeight} {...register("feedWeight")} />
       <NotesField id="fd-r" {...register("remarks")} />
     </RecordCard>
   );

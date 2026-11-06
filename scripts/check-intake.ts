@@ -41,6 +41,7 @@ async function main() {
     zone: "Fish Tank 1",
     unitType: "tank",
   });
+  await db.insert(schema.feed).values({ feed: "SUP", sites: ["PEN"] });
   const who = { pondCode: "PEN-FT1-001" };
   const recordedAt = new Date("2026-10-09T00:30:00.000Z");
   const rows = async (table: PgTable) => (await db.select({ n: count() }).from(table))[0].n;
@@ -61,9 +62,12 @@ async function main() {
   assert.equal(wq.remarks, null, 'a blank note is stored as null, not ""');
   assert.equal(wq.recordedAt.toISOString(), recordedAt.toISOString(), "recorded-at keeps its instant");
   assert.equal(wq.appVersion, "9.9.9", "stamped with the server's app version");
-  await save("feeding", { ...who, recordedAt, feedAmountKg: "3.5", feedingsCount: "2" });
+  await save("feeding", { ...who, recordedAt, feed: "SUP", feedWeight: "3500" });
   await save("mortality", { ...who, recordedAt, mortalityCount: "3", causeDeath: "Water_quality" });
-  assert.equal(await rows(schema.feedingEvents), 1);
+  assert.deepEqual(
+    (await db.select().from(schema.feedingEvents)).map((f) => [f.feed, f.feedWeight]),
+    [["SUP", 3500]],
+  );
   assert.equal((await db.select().from(schema.mortalityEvents))[0].causeDeath, "Water_quality");
 
   // Sampling: event + measured fish in one write; blank rows are skipped.
@@ -84,11 +88,14 @@ async function main() {
   // Invalid input writes nothing: ranges, whole numbers, offset-less time, unknown kind.
   await assert.rejects(save("wq", { ...who, recordedAt, period: "morning", dissolvedOxygen: "25", temperature: "28" }));
   await assert.rejects(save("mortality", { ...who, recordedAt, mortalityCount: "2.5" }));
+  await assert.rejects(save("feeding", { ...who, recordedAt, feedWeight: "500" })); // no Feed
+  await assert.rejects(save("feeding", { ...who, recordedAt, feed: "SUP", feedWeight: "15001" }));
   await assert.rejects(save("mortality", { ...who, recordedAt: "2026-10-09T08:00", mortalityCount: "1" }));
   await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ wt: "", lenSt: "" }] }));
   await assert.rejects(save("bogus" as RecordKind, { ...who, recordedAt })); // deliberately ill-typed
   assert.equal(await rows(schema.wqReadings), 1);
   assert.equal(await rows(schema.mortalityEvents), 1);
+  assert.equal(await rows(schema.feedingEvents), 1);
 
   // A correction names the reading it replaces; blank is no correction, anything but an id is refused.
   const reading = { ...who, recordedAt, period: "morning", temperature: "28.4" };
@@ -132,7 +139,7 @@ async function main() {
   );
 
   // The Person is the caller's (the signed-in Operator), whatever the device sends.
-  await save("feeding", { ...who, recordedAt, feedAmountKg: "1", person: "Someone else" });
+  await save("feeding", { ...who, recordedAt, feed: "SUP", feedWeight: "1", person: "Someone else" });
   assert.ok((await db.select().from(schema.feedingEvents)).every((f) => f.person === "Operator 1"));
 
   // (Field names vs columns are checked when lib/intake.ts loads: reaching this line means they match.)

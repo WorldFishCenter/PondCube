@@ -53,8 +53,8 @@ for (const v of ["1.2.3", "1,2,3", "0x10", "1e1", "Infinity", "-", ",", "abc", "
 assert.equal(waterQualitySchema.parse({ ...base, ...wq, ph: "   " }).ph, undefined); // spaces are blank, never 0
 assert.equal(waterQualitySchema.parse({ ...base, ...wq, nitrite: "0,025" }).nitrite, 0.025);
 // Only where a thousand or more is allowed can a comma before three digits be thousands: never guessed there.
-const fed = (v: string) => feedingSchema.safeParse({ ...base, feedAmountKg: v });
-for (const v of ["1,500", "12,345", "100,000"]) assert.ok(!fed(v).success, `could be thousands: ${v}`);
+const fed = (v: string) => feedingSchema.safeParse({ ...base, feed: "SUP", feedWeight: v });
+for (const v of ["1,500", "12,345"]) assert.ok(!fed(v).success, `could be thousands: ${v}`);
 for (const [v, want] of [
   ["1,5", 1.5],
   ["1,25", 1.25],
@@ -62,12 +62,16 @@ for (const [v, want] of [
   ["1,5000", 1.5],
   ["1500", 1500],
 ] as const)
-  assert.equal(fed(v).data?.feedAmountKg, want, v);
+  assert.equal(fed(v).data?.feedWeight, want, v);
 
-ok(feedingSchema, { feedAmountKg: "0", feedingsCount: "3" });
-bad(feedingSchema, { feedAmountKg: "-1" });
-bad(feedingSchema, { feedAmountKg: "2", feedingsCount: "-1" });
-bad(feedingSchema, { feedAmountKg: "2", feedingsCount: "1.5" });
+// One Feed and its weight: over 0, up to the pond book's 15,000 g.
+ok(feedingSchema, { feed: "SUP", feedWeight: "15000" });
+bad(feedingSchema, { feed: "SUP", feedWeight: "15000.5" });
+bad(feedingSchema, { feed: "SUP", feedWeight: "0" });
+bad(feedingSchema, { feed: "SUP", feedWeight: "-1" });
+bad(feedingSchema, { feed: "SUP", feedWeight: "" });
+bad(feedingSchema, { feedWeight: "500" }); // the Feed is required
+bad(feedingSchema, { feed: "", feedWeight: "500" });
 
 ok(mortalitySchema, { mortalityCount: "0" });
 bad(mortalitySchema, { mortalityCount: "-1" });
@@ -102,9 +106,33 @@ assert.deepEqual(withNewNames("mortality", { suspectedCause: "predation", remark
   causeDeath: undefined,
   noteDeath: "birds; Cause: predation",
 });
-assert.deepEqual(withNewNames("feeding", { feedType: "other", feedTypeOther: "Rice bran", remarks: "" }), {
-  remarks: "Feed type: Rice bran",
+assert.deepEqual(
+  withNewNames("feeding", { feedType: "other", feedTypeOther: "Rice bran", feedAmountKg: "2", remarks: "" }),
+  { feedWeight: "2000", remarks: "Feed type: Rice bran" },
+);
+// Saved before 0.12.0 (kg per feeding): grams, the number of feedings in the remarks. A Draft holds what was typed.
+assert.deepEqual(withNewNames("feeding", { feed: "SUP", feedAmountKg: "1,5", feedingsCount: "2", remarks: "am" }), {
+  feed: "SUP",
+  feedWeight: "1500",
+  remarks: "am; Number of feedings: 2",
 });
+assert.deepEqual(withNewNames("feeding", { feed: undefined, feedAmountKg: "", feedingsCount: "", remarks: "" }), {
+  feed: undefined,
+  feedWeight: "",
+  remarks: "",
+});
+assert.equal(withNewNames("feeding", { feedAmountKg: "abc" }).feedWeight, "abc", "unreadable stays as typed");
+// An Outbox Record holds numbers, and still sends.
+const outboxed = withNewNames("feeding", { ...base, feed: "SUP", feedAmountKg: 2.3, feedingsCount: 3 });
+assert.deepEqual(feedingSchema.parse(outboxed), {
+  ...base,
+  recordedAt: new Date(base.recordedAt),
+  feed: "SUP",
+  feedWeight: 2300, // not 2299.9999999999995
+  remarks: "Number of feedings: 3",
+});
+const fresh = { feed: "SUP", feedWeight: 500, remarks: "x" };
+assert.equal(withNewNames("feeding", fresh), fresh, "new names are left as they are");
 assert.deepEqual(withNewNames("sampling", { fish: [{ id: "f", weightG: 120 }] }), {
   fish: [{ id: "f", wt: 120, lenSt: undefined }],
 });
