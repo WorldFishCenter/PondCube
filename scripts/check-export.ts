@@ -28,11 +28,11 @@ async function main() {
     zone: area,
     unitType: "tank",
   });
-  await db.insert(schema.pond).values([pond("PEN-FT1-001", "PEN", "Fish Tank 1"), pond("TAL-PND-007", "TAL", "Pond")]);
+  await db.insert(schema.pond).values([pond("PEN-FT1-001", "PEN", "Fish Tank 1"), pond("TAL_07", "TAL", "Pond")]);
   // Every Record kind at both sites.
   for (const [pondCode, recordedAt] of [
     ["PEN-FT1-001", new Date("2026-10-29T17:30:00Z")], // 01:30 on 30 October in Penang
-    ["TAL-PND-007", new Date("2026-10-29T17:30:00Z")],
+    ["TAL_07", new Date("2026-10-29T17:30:00Z")],
   ] as const) {
     const at = { pondCode, recordedAt, person: "Ana", appVersion: "0.10.0" };
     await db.insert(schema.wqReadings).values({ ...at, period: "morning", dissolvedOxygen: 6.5, temperature: 29 });
@@ -64,6 +64,7 @@ async function main() {
   assert.equal(pen[0].dissolved_oxygen, 6.5);
   const [tal] = await readRows(db, "wq", ["TAL"]);
   assert.equal(tal.date, "20261029", "23:30 the day before in Dhaka");
+  assert.equal(tal.tank, 7, "a DMS pond code's number (TAL_07)");
   assert.equal(tal.period, "afternoon", "the Period is the site's too, whatever the device sent");
   const legacy = await readRows(db, "wq", ["PEN"], { date: "202507" });
   assert.deepEqual([legacy.length, legacy[0].source, legacy[0].time], [1, "legacy", "08:00"]);
@@ -73,7 +74,7 @@ async function main() {
   const [typo, other] = await db
     .insert(schema.wqReadings)
     .values(
-      ["PEN-FT1-001", "TAL-PND-007"].map((pondCode) => ({
+      ["PEN-FT1-001", "TAL_07"].map((pondCode) => ({
         pondCode,
         recordedAt: new Date("2026-11-02T01:00:00Z"),
         period: "morning",

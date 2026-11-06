@@ -57,7 +57,7 @@ const optional = text.transform((s) => s || null);
 const number = optional.pipe(z.coerce.number<string>({ error: "is not a number" }).nullable());
 const wholeNumber = number.pipe(z.number().int("is not a whole number").nullable());
 const date = optional.pipe(z.iso.date({ error: "is not a date (YYYY-MM-DD)" }).nullable());
-const POND_CODE = /^[A-Z]{3}-[A-Z0-9]{3}-\d{3}$/;
+const POND_CODE = /^[A-Z]{3}_\d{2,3}$|^[A-Z]{3}-[A-Z0-9]{3}-\d{3}$/; // DMS TAL_01; Penang's until renumbered
 const SPECIES = /^[A-Z]{2}$/;
 const SITE = /^[A-Z]{3}$/;
 const upper = text.transform((s) => s.toUpperCase());
@@ -110,12 +110,12 @@ const speciesRow = z
 
 const pondRow = z
   .object({
-    pond_code: upper.pipe(z.string().regex(POND_CODE, "should look like PEN-FT3-091")),
+    pond_code: upper.pipe(z.string().regex(POND_CODE, "should look like TAL_01 (or PEN-FT3-091)")),
     display_name: required,
     site: required.pipe(z.string().regex(SITE, "should link to one row of sites")),
     area: required,
-    area_code: required,
-    zone: required,
+    area_code: optional,
+    zone: optional,
     unit_type: required,
     legacy_location: optional,
     legacy_tank_id: wholeNumber,
@@ -125,7 +125,7 @@ const pondRow = z
     area_pond: number,
     depth_m: number,
     water_source: optional,
-    species: optional.pipe(z.string().regex(SPECIES, "should link to one row of species").nullable()),
+    species: z.array(z.string().regex(SPECIES, "should link to rows of species")).default([]),
     status: text.transform((s) => s.toLowerCase() || "active"), // the app lists only "active" ponds
     commissioned_date: date,
     note_pond: optional,
@@ -207,7 +207,7 @@ function planSync(rows: AirtableRows): { plan: SyncPlan; problems: string[] } {
     const ponds = rows.ponds.map((p) => ({
       ...p,
       ...("site" in p ? { site: linkOne(sites.codes, p.site) } : {}),
-      ...("species" in p ? { species: linkOne(species.codes, p.species) } : {}),
+      ...("species" in p ? { species: resolve(species.codes, p.species) } : {}),
     }));
     plan.ponds = checkRows("ponds", "pond_code", ponds, pondRow, (p) => p.pondCode, problems);
     if (!plan.ponds.length) problems.push("ponds: Airtable returned none; refusing to retire every pond");

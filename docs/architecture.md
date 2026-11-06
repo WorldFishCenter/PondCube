@@ -34,13 +34,15 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
   WorldFish DMS v5 names a field, the column (and the Airtable field) uses that name: `site`,
   `lat_pond`, `long_pond`, `area_pond` (hectares), `note_pond` (see `docs/naming-alignment.md`).
   Carries `legacy_location` + `legacy_tank_id` so converted historical rows map onto today's pond
-  codes. Its `site` points to a row of `site`, its `species` to a row of `species`.
+  codes. Its `site` points to a row of `site`; its `species` lists codes from `species` (several in polyculture,
+  as the DMS's `pond_treat`). Pond codes follow the DMS (`TAL_01`: site, then the pond's number); Penang's
+  `PEN-FT3-091` stays until it's renumbered, and only Penang fills `area_code` and `zone`.
 - **`feed`** — the DMS feed list (`feed`, three characters; `note_feed`) with the `sites` that use
   it, mirroring the Airtable `feeds` table. A Feeding event's `feed` points to one; the form offers
   the feeds of the chosen pond's site, and the records route refuses any other.
 - **`species`** — the DMS species list (`species` two-letter code, `species_latin`, `species_common`),
-  mirroring the Airtable `species` table. In Airtable a pond's species is a link to that table; the
-  sync turns the link into the code. Never removed from Neon.
+  mirroring the Airtable `species` table. In Airtable a pond's species are links to that table; the
+  sync turns the links into the codes. Never removed from Neon.
 - **`operators`** — the people who record, with the email each signs in with and the `sites`
   (one or more codes) whose ponds they see and record. The signed-in operator's name is attached
   to each record as its `person`.

@@ -46,14 +46,14 @@ export const feed = pgTable("feed", {
 
 // ---- Ponds (mirrors the Airtable ponds table; WorldFish DMS v5 names where it has one) ----
 export const pond = pgTable("pond", {
-  pondCode: text("pond_code").primaryKey(), // e.g. PEN-FT3-091
+  pondCode: text("pond_code").primaryKey(), // DMS SITE_POND, e.g. TAL_01; Penang still PEN-FT3-091
   displayName: text("display_name").notNull(),
   site: text("site")
     .notNull()
     .references(() => site.site),
   area: text("area").notNull(),
-  areaCode: text("area_code").notNull(),
-  zone: text("zone").notNull(),
+  areaCode: text("area_code"), // Penang only
+  zone: text("zone"), // Penang only
   unitType: text("unit_type").notNull(),
   legacyLocation: text("legacy_location"),
   legacyTankId: integer("legacy_tank_id"),
@@ -63,7 +63,8 @@ export const pond = pgTable("pond", {
   areaPond: doublePrecision("area_pond"), // hectares
   depthM: doublePrecision("depth_m"),
   waterSource: text("water_source"),
-  species: text("species").references(() => species.species),
+  // Several in polyculture (DMS pond_treat SPECIES_1..5). No FK on items, as for operators.sites.
+  species: text("species").array().notNull().default([]),
   status: text("status").notNull().default("active"),
   commissionedDate: date("commissioned_date"),
   notePond: text("note_pond"),
@@ -222,7 +223,7 @@ const recordFields = (t: { recordedAt: AnyPgColumn }) => ({
 });
 const pondFields = {
   [P.area]: pond.area,
-  [P.tank]: sql<number>`right(${pond.pondCode}, 3)::int`,
+  [P.tank]: sql<number>`substring(${pond.pondCode} from '[0-9]+$')::int`, // trailing digits: PEN-FT3-091, TAL_07
   [P.pond_code]: pond.pondCode,
 };
 // The fields every Record view ends with (sampling's then adds its fish).

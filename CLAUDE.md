@@ -81,6 +81,7 @@ scripts/sync-airtable.ts  Airtable (PondCube base: sites, species, feeds, ponds,
 scripts/import-legacy.ts  One-off: legacy Excel log (converted CSV) → wq_readings; its decisions are in the file header
 scripts/migrate-0.8.0.sql One-off: production from 0.7.0 to 0.8.0 (DMS v3 renames, values kept); see docs/architecture.md
 scripts/migrate-0.10.0.sql One-off: each site's timezone and a changed view, before push (0.9.0 → 0.10.0)
+scripts/migrate-0.12.0.sql One-off: a pond's species become a list; area_code, zone optional; before push (0.11.0 → 0.12.0)
 scripts/check-*.ts        The self-checks run by `npm run check` (fake-storage.ts: their storage adapters; xlsx-dump.py: openpyxl)
 ```
 

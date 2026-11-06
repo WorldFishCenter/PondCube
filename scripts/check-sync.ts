@@ -65,7 +65,7 @@ async function main() {
   await fails({ ponds: [pond("PEN-FT1-001", { lat_pond: "5,35" })] }, /lat_pond is not a number/);
   await fails({ ponds: [pond("PEN-FT1-001", { legacy_tank_id: 1.5 })] }, /legacy_tank_id is not a whole number/);
   await fails({ ponds: [pond("PEN-FT1-001", { commissioned_date: "Jan 2024" })] }, /commissioned_date is not a date/);
-  await fails({ ponds: [pond("PEN FT1 001")] }, /should look like PEN-FT3-091/);
+  await fails({ ponds: [pond("PEN FT1 001")] }, /should look like TAL_01/);
   await fails({ ponds: [pond("PEN-FT1-001"), pond("pen-ft1-001")] }, /duplicate of ponds row 1/);
   await fails({ operators: [op("Ana"), { name: "ana " }] }, /duplicate of operators row 1/);
   await fails({ operators: [op("Ana", { email: "ana" })] }, /email is not an email address/);
@@ -81,9 +81,8 @@ async function main() {
   await fails({ species: [{ ...nile, species: "ONI" }] }, /should be two letters/);
   await fails(
     { species: [nile], ponds: [pond("PEN-FT1-001", { species: ["recXX"] })] },
-    /should link to one row of species/,
+    /should link to rows of species/,
   );
-  await fails({ species: [nile], ponds: [pond("PEN-FT1-001", { species: ["recON", "recON"] })] }, /one row of species/);
   await fails({ sites: [{ ...pen, site: "PENA" }] }, /should be three letters/);
   // The export turns instants into the site's local DATE and TIME.
   await fails({ sites: [{ ...pen, timezone: undefined }] }, /timezone is empty/);
@@ -133,13 +132,21 @@ async function main() {
   await synced({ ponds: [pond("PEN-FT1-001"), pond("PEN-FT1-002")] });
   assert.equal((await pondRow("PEN-FT1-002"))?.status, "active");
 
-  // A pond's species is a link to a species row (blank ones skipped); Neon keeps the code.
+  // A pond's species are links to species rows (blank ones skipped), several in polyculture; Neon keeps the codes.
+  const catla = { id: "recCC", species: "CC", species_latin: "Catla catla" };
   await synced({
-    species: [nile, { id: "recBlank" }],
-    ponds: [pond("PEN-FT1-001", { species: ["recON"] }), pond("PEN-FT1-002")],
+    species: [nile, catla, { id: "recBlank" }],
+    ponds: [pond("PEN-FT1-001", { species: ["recON", "recCC"] }), pond("PEN-FT1-002")],
   });
-  assert.equal((await pondRow("PEN-FT1-001"))?.species, "ON", "link resolved to the code, upper-cased");
-  assert.equal((await db.select().from(schema.species)).length, 1);
+  assert.deepEqual((await pondRow("PEN-FT1-001"))?.species, ["ON", "CC"], "links resolved to codes, upper-cased");
+  assert.deepEqual((await pondRow("PEN-FT1-002"))?.species, [], "no species: empty list");
+  assert.equal((await db.select().from(schema.species)).length, 2);
+
+  // A DMS pond code (SITE_POND), without Penang's area code and zone.
+  await synced({
+    ponds: [pond("PEN-FT1-001"), pond("PEN-FT1-002"), pond("PEN_07", { area_code: undefined, zone: undefined })],
+  });
+  assert.equal((await pondRow("PEN_07"))?.zone, null);
 
   // Renamed in Airtable, same email: the new name takes the email, the old one is deactivated.
   await synced({ operators: [op("Ana", { email: "ana@x.org" })] });
