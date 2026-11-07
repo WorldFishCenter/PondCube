@@ -6,6 +6,11 @@ features the second, fixes the third.
 
 ## [0.12.0] - 2026-11-06
 
+### Added
+
+- Mortality records now say which species died, at every site. Pick it from the pond's species, shown with its common name, such as "CC (Catla)". If the pond has only one species, it's already picked. The species is required.
+- A mortality record can also have a fish's PIT tag: 10 characters, numbers 0 to 9 and letters A to F, such as 00075D5F96. A record with a PIT tag is that one fish, so its number of dead fish must be 1. Without a PIT tag, it's a count of dead fish, as before. The PIT tag box takes ordinary text, so a tag reader that types into the phone can fill it in.
+
 ### Changed
 
 - Feeding now follows the pond book, at every site: one record for each feed given, with the feed and its weight in grams. If a pond gets two feeds in a day, save two records. The feed is now required, chosen from your site's list. "Amount fed (kg)" and "Number of feedings" are gone.
@@ -13,6 +18,8 @@ features the second, fixes the third.
 - Feeding records typed or saved on your phone before this update are not lost. Their amount is turned from kilograms into grams, and the number of feedings is added to their remarks. If one being filled in has no feed, pick one before saving.
 - Data links: the feeding file's columns change. FEED_AMOUNT_KG and FEEDINGS_COUNT are replaced by FEED_WEIGHT, in grams. A spreadsheet built on the old feeding columns stops working until its feeding query is set up again.
 - Data links: in the ponds file, a pond can now list several species (fish raised together), separated by commas.
+- Mortality records typed or saved on your phone before this update are not lost. One being filled in asks for the species before saving, or has it already picked if the pond has only one. One already saved is sent as before, and gets the pond's species if the pond has only one.
+- Data links: the mortality file gets two new columns after POND: SPECIES and PIT. Its other columns stay as they were.
 
 ## [0.11.0] - 2026-11-01
 

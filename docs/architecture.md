@@ -49,7 +49,10 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 - **`wq_readings`, `feeding_events`, `mortality_events`** — flat event tables. A water-quality Correction names
   the reading of its pond it replaces in `replaces` (no foreign key: that reading may reach the server later, or be
   refused); `export_wq` leaves replaced readings out. A Feeding event is one `feed` and its `feed_weight` in grams,
-  as the pond book's daily FEED n TYPE / FEED n WEIGHT (g): the DMS has no daily feed table.
+  as the pond book's daily FEED n TYPE / FEED n WEIGHT (g): the DMS has no daily feed table. A Mortality record has
+  a `species` (DMS `SPECIES`) and, for one tagged fish, its `pit` (the pond book's PIT; the count is then 1). Both
+  columns are nullable and `lib/validation.ts` requires the species; a Record saved on a device before species were
+  asked arrives without one, and intake gives it its pond's species when the pond lists exactly one, else none.
 - **`app_version`** on every record table (fish measurements inherit it from their sampling
   event): the app version that saved it, set on the server by record intake, or `legacy` for the
   imported Excel log. Use it to trace records to the code and rules that accepted them.
@@ -454,4 +457,6 @@ npm run dev         # http://localhost:3000
    (drizzle-kit's `generateMigration`), and no view is ever missing; push then has nothing left but a harmless
    `SET DEFAULT '{}'` on `pond.species`. The feeding one was applied to dev and production on 2026-11-06. From then on, an
    app older than 0.12.0 can't store a Feeding event: it waits on the phone and sends once that phone has 0.12.0,
-   which reads it as grams.
+   which reads it as grams. Last, `scripts/migrate-0.12.0-mortality.sql` (a Mortality record's `species` and `pit`),
+   the same way, with `export_mortality` recreated in its transaction. It only adds, so older apps keep storing
+   Mortality records (without either). Applied to dev on 2026-11-06 and to production on 2026-11-07.

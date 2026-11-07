@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { count, eq } from "drizzle-orm";
+import { count, eq, inArray } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import * as schema from "../lib/schema";
@@ -31,7 +31,15 @@ async function main() {
     return intake.save(kind, sent, "Operator 1");
   };
 
-  await db.insert(schema.site).values({ site: "PEN", nameSite: "Batu Maung", timezone: "Asia/Kuala_Lumpur" });
+  await db.insert(schema.site).values([
+    { site: "PEN", nameSite: "Batu Maung", timezone: "Asia/Kuala_Lumpur" },
+    { site: "TAL", nameSite: "Talbaria", timezone: "Asia/Dhaka" },
+  ]);
+  await db.insert(schema.species).values([
+    { species: "ON", speciesLatin: "Oreochromis niloticus" },
+    { species: "CC", speciesLatin: "Catla catla", speciesCommon: "Catla" },
+    { species: "LR", speciesLatin: "Labeo rohita", speciesCommon: "Rohu" },
+  ]);
   await db.insert(schema.pond).values({
     pondCode: "PEN-FT1-001",
     displayName: "Fish Tank 1 - #1",
@@ -40,7 +48,18 @@ async function main() {
     areaCode: "FT1",
     zone: "Fish Tank 1",
     unitType: "tank",
+    species: ["ON"],
   });
+  // Polyculture, and a pond whose species aren't known.
+  const talPond = (pondCode: string, species: string[]) => ({
+    pondCode,
+    displayName: pondCode,
+    site: "TAL",
+    area: "Pond",
+    unitType: "pond",
+    species,
+  });
+  await db.insert(schema.pond).values([talPond("TAL_01", ["CC", "LR"]), talPond("TAL_32", [])]);
   await db.insert(schema.feed).values({ feed: "SUP", sites: ["PEN"] });
   const who = { pondCode: "PEN-FT1-001" };
   const recordedAt = new Date("2026-10-09T00:30:00.000Z");
@@ -63,7 +82,7 @@ async function main() {
   assert.equal(wq.recordedAt.toISOString(), recordedAt.toISOString(), "recorded-at keeps its instant");
   assert.equal(wq.appVersion, "9.9.9", "stamped with the server's app version");
   await save("feeding", { ...who, recordedAt, feed: "SUP", feedWeight: "3500" });
-  await save("mortality", { ...who, recordedAt, mortalityCount: "3", causeDeath: "Water_quality" });
+  await save("mortality", { ...who, recordedAt, species: "ON", mortalityCount: "3", causeDeath: "Water_quality" });
   assert.deepEqual(
     (await db.select().from(schema.feedingEvents)).map((f) => [f.feed, f.feedWeight]),
     [["SUP", 3500]],
@@ -87,10 +106,12 @@ async function main() {
 
   // Invalid input writes nothing: ranges, whole numbers, offset-less time, unknown kind.
   await assert.rejects(save("wq", { ...who, recordedAt, period: "morning", dissolvedOxygen: "25", temperature: "28" }));
-  await assert.rejects(save("mortality", { ...who, recordedAt, mortalityCount: "2.5" }));
+  await assert.rejects(save("mortality", { ...who, recordedAt, species: "ON", mortalityCount: "2.5" }));
   await assert.rejects(save("feeding", { ...who, recordedAt, feedWeight: "500" })); // no Feed
   await assert.rejects(save("feeding", { ...who, recordedAt, feed: "SUP", feedWeight: "15001" }));
-  await assert.rejects(save("mortality", { ...who, recordedAt: "2026-10-09T08:00", mortalityCount: "1" }));
+  await assert.rejects(
+    save("mortality", { ...who, recordedAt: "2026-10-09T08:00", species: "ON", mortalityCount: "1" }),
+  );
   await assert.rejects(save("sampling", { ...who, recordedAt, fish: [{ wt: "", lenSt: "" }] }));
   await assert.rejects(save("bogus" as RecordKind, { ...who, recordedAt })); // deliberately ill-typed
   assert.equal(await rows(schema.wqReadings), 1);
@@ -107,7 +128,9 @@ async function main() {
   assert.equal(links.length, 3);
 
   // Unknown pond: the foreign key rejects it.
-  await assert.rejects(save("mortality", { ...who, pondCode: "PEN-NOPE-999", recordedAt, mortalityCount: "1" }));
+  await assert.rejects(
+    save("mortality", { ...who, pondCode: "PEN-NOPE-999", recordedAt, species: "ON", mortalityCount: "1" }),
+  );
 
   // Atomic: if the fish insert fails, the sampling event is not kept either.
   await client.exec("ALTER TABLE fish_measurements RENAME TO fish_measurements_off");
@@ -116,7 +139,7 @@ async function main() {
   assert.equal(await rows(schema.samplingEvents), 1, "no orphan sampling event");
 
   // A resend (same id, its first reply lost) is skipped: the Record, and a Sampling event's fish, are stored once.
-  const again = { ...who, recordedAt, id: id() };
+  const again = { ...who, recordedAt, id: id(), species: "ON" };
   await save("mortality", { ...again, mortalityCount: "4" });
   await save("mortality", { ...again, mortalityCount: "4" });
   assert.equal(await rows(schema.mortalityEvents), 2, "one new mortality record, not two");
@@ -134,9 +157,50 @@ async function main() {
   assert.equal(await rows(schema.samplingEvents), 2);
   assert.equal(await rows(schema.fishMeasurements), fishBefore, "a resent Sampling event adds no fish");
   await assert.rejects(
-    save("mortality", { ...who, recordedAt, id: undefined, mortalityCount: "1" }),
+    save("mortality", { ...who, recordedAt, id: undefined, species: "ON", mortalityCount: "1" }),
     "no id, not stored",
   );
+
+  // A Mortality record names its species, and with a PIT tag (kept uppercase) is that one fish.
+  const deaths = async (ids: string[]) =>
+    (
+      await db
+        .select()
+        .from(schema.mortalityEvents)
+        .where(inArray(schema.mortalityEvents.id, ids))
+        .orderBy(schema.mortalityEvents.pondCode)
+    ).map((m) => [m.pondCode, m.species, m.pit, m.mortalityCount]);
+  const tagged = id();
+  await save("mortality", {
+    id: tagged,
+    pondCode: "TAL_01",
+    recordedAt,
+    species: "LR",
+    pit: "00075d5f96",
+    mortalityCount: "1",
+  });
+  assert.deepEqual(await deaths([tagged]), [["TAL_01", "LR", "00075D5F96", 1]]);
+  const tal = { pondCode: "TAL_01", recordedAt };
+  await assert.rejects(save("mortality", { ...tal, species: "LR", pit: "00075D5F96", mortalityCount: "2" }));
+  await assert.rejects(save("mortality", { ...tal, species: "LR", pit: "7D1", mortalityCount: "1" }));
+  await assert.rejects(save("mortality", { ...tal, species: "", mortalityCount: "1" }));
+  await assert.rejects(save("mortality", { ...tal, species: "XX", mortalityCount: "1" })); // not on the species list
+
+  // Saved on a device before species was asked (a Draft or Outbox Record): never refused for it. It takes its pond's
+  // species when the pond lists exactly one, else none; the rest is checked as ever.
+  const old = { a: id(), b: id(), c: id() };
+  await save("mortality", { id: old.a, ...who, recordedAt, mortalityCount: "2", causeDeath: "Unknown" });
+  await save("mortality", { id: old.b, ...tal, mortalityCount: "2" });
+  await save("mortality", { id: old.c, pondCode: "TAL_32", recordedAt, mortalityCount: "2" });
+  assert.deepEqual(await deaths([old.a, old.b, old.c]), [
+    ["PEN-FT1-001", "ON", null, 2],
+    ["TAL_01", null, null, 2],
+    ["TAL_32", null, null, 2],
+  ]);
+  await assert.rejects(save("mortality", { ...tal, mortalityCount: "2", pit: "00075D5F96" }));
+  await assert.rejects(save("mortality", { ...tal, mortalityCount: "-1" }));
+  await save("mortality", { id: old.a, ...who, recordedAt, mortalityCount: "2" }); // a resend: still stored once
+  assert.equal(await rows(schema.mortalityEvents), 6);
 
   // The Person is the caller's (the signed-in Operator), whatever the device sends.
   await save("feeding", { ...who, recordedAt, feed: "SUP", feedWeight: "1", person: "Someone else" });

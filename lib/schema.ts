@@ -129,6 +129,9 @@ export const mortalityEvents = pgTable("mortality_events", {
     .notNull()
     .references(() => pond.pondCode),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+  // Required by lib/validation.ts; null only on a Record saved before it was asked, at a pond without one species
+  species: text("species").references(() => species.species),
+  pit: text("pit"), // the pond book's PIT: this Record is that one fish
   mortalityCount: integer("mortality_count").notNull(),
   causeDeath: text("cause_death"),
   noteDeath: text("note_death"),
@@ -184,6 +187,7 @@ export const PROVISIONAL = {
   remarks: "remarks",
   feed_weight: "feed_weight", // g; the pond book's FEED n WEIGHT
   mortality_count: "mortality_count",
+  pit: "pit", // the pond book's; the DMS names a tagged fish INDIV (spawn round + PIT)
   sampling_event: "sampling_event", // the Sampling event's id, shared by its Fish measurements
   notes: "notes",
   display_name: "display_name",
@@ -296,6 +300,8 @@ export const mortalityView = pgView("export_mortality").as((qb) =>
         named({
           ...recordFields(mortalityEvents),
           ...pondFields,
+          species: mortalityEvents.species,
+          [P.pit]: mortalityEvents.pit,
           [P.mortality_count]: mortalityEvents.mortalityCount,
           cause_death: mortalityEvents.causeDeath,
           note_death: mortalityEvents.noteDeath,

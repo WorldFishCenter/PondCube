@@ -90,8 +90,16 @@ day. Two Feeds the same day are two Feeding events.
 _Avoid_: feed log, amount fed
 
 **Mortality record**
-A count of dead fish removed from a Pond, optionally with a cause of death (one of the DMS's eleven).
+A count of dead fish of one Species removed from a Pond, optionally with a cause of death (one of the DMS's eleven).
+With a PIT it is that one tagged fish, so the count is 1. A Mortality record saved on a device before species were
+asked takes its Pond's Species when the Pond lists exactly one, and otherwise has none.
 _Avoid_: death event, loss
+
+**PIT**
+The code of a fish's PIT tag (passive integrated transponder), as the pond book writes it: 10 characters, 0–9 and
+A–F, e.g. `00075D5F96`. Tags are reused, so a PIT alone doesn't name a fish for good: the DMS's `INDIV` is the spawn
+round plus the PIT.
+_Avoid_: tag number, chip, INDIV
 
 **Sampling event**
 A sample of fish taken from a Pond, made of one or more Fish measurements.

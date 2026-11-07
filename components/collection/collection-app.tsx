@@ -22,21 +22,21 @@ import { PondCombobox, type Pond } from "./pond-combobox";
 import { FILLED_TAB, RecordedAtField, type RecordFormProps } from "./record-form";
 import { WaterRound } from "./water-round";
 import { FeedingForm, type Feed } from "./feeding-form";
-import { MortalityForm } from "./mortality-form";
+import { MortalityForm, type Species } from "./mortality-form";
 import { SamplingForm } from "./sampling-form";
 
 const POND_KEY = "pondcube:lastPond";
 const RECORDED_AT_KEY = "pondcube:recordedAt"; // kept so a refresh mid-record doesn't lose it
 
 // One tab per Record kind (lib/validation.ts RECORD_KINDS; the compiler flags a missing one), in tab order. Each form
-// owns its fields and its kind's draft; only the Feeding form uses `feeds`. Water is a Round, not a form.
+// owns its fields and its kind's draft; only the Feeding form uses `feeds`, only Mortality `species`. Water is a Round.
 const FORMS = {
   feeding: { label: "Feeding", Form: FeedingForm },
   mortality: { label: "Mortality", Form: MortalityForm },
   sampling: { label: "Sampling", Form: SamplingForm },
 } satisfies Record<
   Exclude<RecordKind, "wq">,
-  { label: string; Form: React.ComponentType<RecordFormProps & { feeds: Feed[] }> }
+  { label: string; Form: React.ComponentType<RecordFormProps & { feeds: Feed[]; species: Species[] }> }
 >;
 const TABS = { wq: { label: "Water" }, ...FORMS } satisfies Record<RecordKind, { label: string }>;
 
@@ -90,13 +90,15 @@ export function CollectionApp({
   sites,
   ponds,
   feeds,
+  species,
   version,
 }: {
   person: string;
   account: string;
   sites: string[];
-  ponds: Pond[];
+  ponds: (Pond & { species: string[] })[];
   feeds: (Feed & { sites: string[] })[];
+  species: Species[];
   version: string;
 }) {
   const [chosenPond, setPondCode] = React.useState("");
@@ -105,6 +107,7 @@ export function CollectionApp({
   const pondCode = pond?.pondCode ?? "";
   const site = pond?.site;
   const feedsHere = feeds.filter((f) => site && f.sites.includes(site)); // the chosen pond's site's feeds
+  const speciesHere = pond?.species.length ? species.filter((s) => pond.species.includes(s.species)) : species;
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);
   const [kind, setKind] = React.useState<RecordKind>("wq");
@@ -192,7 +195,14 @@ export function CollectionApp({
               </Card>
               {pondCode ? (
                 // Keyed by pond: switching ponds remounts the form with that pond's draft.
-                <Form key={pondCode} pondCode={pondCode} recordedAt={when} outbox={outbox} feeds={feedsHere} />
+                <Form
+                  key={pondCode}
+                  pondCode={pondCode}
+                  recordedAt={when}
+                  outbox={outbox}
+                  feeds={feedsHere}
+                  species={speciesHere}
+                />
               ) : (
                 <Alert>
                   <Info />

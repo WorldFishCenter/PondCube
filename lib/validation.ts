@@ -107,13 +107,31 @@ export const feedingForm = z.object({
 });
 export const feedingSchema = feedingForm.extend(forSave);
 
-export const mortalityForm = z.object({
+const mortality = z.object({
   id: madeAtSave(),
+  species: z.string({ error: "Select a species" }).min(1, "Select a species"), // every DMS death row has one
+  // The pond book's PIT, as a tag reader types it: 10 characters, 0–9 and A–F (00075D5F96).
+  pit: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim().toUpperCase() || undefined : (v ?? undefined)),
+    z
+      .string()
+      .regex(/^[0-9A-F]{10}$/, "PIT tag: 10 characters, 0–9 and A–F")
+      .optional(),
+  ),
   mortalityCount: reqNum(0, 1000000, "Number of dead fish", true),
   causeDeath: enumOf(CAUSES).optional(),
   noteDeath: note,
 });
-export const mortalitySchema = mortalityForm.extend(forSave);
+// With a PIT the Record is that one fish.
+const onePerPit = <S extends z.ZodType<{ pit?: string; mortalityCount: number }>>(s: S) =>
+  s.refine((r) => r.pit === undefined || r.mortalityCount === 1, {
+    error: "With a PIT tag, the number of dead fish is 1",
+    path: ["mortalityCount"],
+  });
+export const mortalityForm = onePerPit(mortality);
+export const mortalitySchema = onePerPit(mortality.extend(forSave));
+/** Saved on a device before species was asked, so without one: intake gives it its pond's (lib/intake.ts). */
+export const mortalityBeforeSpecies = onePerPit(mortality.extend({ ...forSave, species: z.never().optional() }));
 
 // A fish never weighs or measures 0, though the DMS Range starts there.
 const trait = (range: readonly [number, number]) => optNum(...range).refine((v) => v !== 0, "Must be more than 0");

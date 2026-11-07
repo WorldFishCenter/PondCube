@@ -30,6 +30,7 @@ async function main() {
   });
   await db.insert(schema.pond).values([pond("PEN-FT1-001", "PEN", "Fish Tank 1"), pond("TAL_07", "TAL", "Pond")]);
   await db.insert(schema.feed).values({ feed: "SUP", sites: ["PEN", "TAL"] });
+  await db.insert(schema.species).values({ species: "ON", speciesLatin: "Oreochromis niloticus" });
   // Every Record kind at both sites.
   for (const [pondCode, recordedAt] of [
     ["PEN-FT1-001", new Date("2026-10-29T17:30:00Z")], // 01:30 on 30 October in Penang
@@ -38,7 +39,9 @@ async function main() {
     const at = { pondCode, recordedAt, person: "Ana", appVersion: "0.10.0" };
     await db.insert(schema.wqReadings).values({ ...at, period: "morning", dissolvedOxygen: 6.5, temperature: 29 });
     await db.insert(schema.feedingEvents).values({ ...at, feed: "SUP", feedWeight: 2000 });
-    await db.insert(schema.mortalityEvents).values({ ...at, mortalityCount: 3, causeDeath: "Unknown" });
+    await db
+      .insert(schema.mortalityEvents)
+      .values({ ...at, species: "ON", pit: "00075D5F96", mortalityCount: 1, causeDeath: "Unknown" });
     const [event] = await db.insert(schema.samplingEvents).values(at).returning();
     await db.insert(schema.fishMeasurements).values([
       { samplingEventId: event.id, wt: 120 },
@@ -127,6 +130,25 @@ async function main() {
     ),
   );
   assert.deepEqual(fish.map((f) => f.wt).sort(), [120, 130]);
+
+  // Mortality: SPECIES and PIT after POND, as in the pond book; every earlier column kept, in its order.
+  assert.deepEqual(columnsOf("mortality"), [
+    "site",
+    "date",
+    "time",
+    "area",
+    "tank",
+    "pond",
+    "species",
+    "pit",
+    "mortality_count",
+    "cause_death",
+    "note_death",
+    "person",
+    "source",
+  ]);
+  const [death] = await readRows(db, "mortality", ["TAL"]);
+  assert.deepEqual([death.species, death.pit, death.mortality_count], ["ON", "00075D5F96", 1]);
 
   // Data links: a key per sign-in account, worked out on every request as at sign-in.
   await db.insert(schema.operators).values([

@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   waterQualitySchema,
   feedingSchema,
+  mortalityBeforeSpecies,
+  mortalityForm,
   mortalitySchema,
   recordedAtLocal,
   samplingForm,
@@ -73,12 +75,29 @@ bad(feedingSchema, { feed: "SUP", feedWeight: "" });
 bad(feedingSchema, { feedWeight: "500" }); // the Feed is required
 bad(feedingSchema, { feed: "", feedWeight: "500" });
 
-ok(mortalitySchema, { mortalityCount: "0" });
-bad(mortalitySchema, { mortalityCount: "-1" });
-bad(mortalitySchema, { mortalityCount: "2.5" });
-ok(mortalitySchema, { mortalityCount: "1", causeDeath: "Water_quality" }); // enums come from lib/options
-bad(mortalitySchema, { mortalityCount: "1", causeDeath: "water_quality" }); // DMS codes are case-sensitive
-bad(mortalitySchema, { mortalityCount: "1", causeDeath: "Cull" }); // v3 only: v5 splits it into Cull_*
+ok(mortalitySchema, { species: "ON", mortalityCount: "0" });
+bad(mortalitySchema, { species: "ON", mortalityCount: "-1" });
+bad(mortalitySchema, { species: "ON", mortalityCount: "2.5" });
+ok(mortalitySchema, { species: "ON", mortalityCount: "1", causeDeath: "Water_quality" }); // enums come from lib/options
+bad(mortalitySchema, { species: "ON", mortalityCount: "1", causeDeath: "water_quality" }); // DMS codes are case-sensitive
+bad(mortalitySchema, { species: "ON", mortalityCount: "1", causeDeath: "Cull" }); // v3 only: v5 splits it into Cull_*
+// Species is required: every DMS death row has one.
+bad(mortalitySchema, { mortalityCount: "1" });
+bad(mortalitySchema, { species: "", mortalityCount: "1" });
+// A PIT tag is 10 characters, 0–9 and A–F, kept uppercase; blank is no PIT. The pond book's typos are refused.
+const pitOf = (pit: string) => mortalitySchema.parse({ ...base, species: "ON", mortalityCount: "1", pit }).pit;
+assert.equal(pitOf(" 00075d5f96 "), "00075D5F96");
+assert.equal(pitOf("   "), undefined);
+for (const pit of ["7D1", "7973855", "0007AF382", "00075D5F96A", "00075D5G96", "00075D 5F96"])
+  bad(mortalitySchema, { species: "ON", mortalityCount: "1", pit });
+// With a PIT the Record is that one fish, on the device and on the server; without one it's a count, as before.
+for (const s of [mortalityForm, mortalitySchema])
+  for (const mortalityCount of ["0", "2"]) bad(s, { species: "ON", mortalityCount, pit: "00075D5F96" });
+ok(mortalitySchema, { species: "ON", mortalityCount: "25" });
+// Saved before species was asked: no species, still checked otherwise; intake gives it its pond's.
+ok(mortalityBeforeSpecies, { mortalityCount: "2" });
+bad(mortalityBeforeSpecies, { mortalityCount: "2", pit: "00075D5F96" });
+bad(mortalityBeforeSpecies, { mortalityCount: "-1" });
 
 const fishId = base.id; // any uuid
 ok(samplingSchema, {
@@ -153,24 +172,24 @@ assert.equal(at.toISOString(), "2026-10-09T00:00:00.000Z");
 for (const v of ["", "not a date", "T08:00", "2026-10-09T"]) assert.ok(!recordedAtLocal.safeParse(v).success, v);
 // Save side: only instants. An offset-less string would shift by the server's timezone, so it's rejected.
 assert.equal(
-  mortalitySchema.parse({ ...base, recordedAt: at, mortalityCount: "1" }).recordedAt.getTime(),
+  mortalitySchema.parse({ ...base, recordedAt: at, species: "ON", mortalityCount: "1" }).recordedAt.getTime(),
   at.getTime(),
 );
 assert.equal(
   mortalitySchema
-    .parse({ ...base, recordedAt: "2026-10-09T08:00:00+08:00", mortalityCount: "1" })
+    .parse({ ...base, recordedAt: "2026-10-09T08:00:00+08:00", species: "ON", mortalityCount: "1" })
     .recordedAt.toISOString(),
   "2026-10-09T00:00:00.000Z",
 );
-bad(mortalitySchema, { recordedAt: "2026-10-09T08:00", mortalityCount: "1" });
-bad(mortalitySchema, { recordedAt: "", mortalityCount: "1" });
+bad(mortalitySchema, { recordedAt: "2026-10-09T08:00", species: "ON", mortalityCount: "1" });
+bad(mortalitySchema, { recordedAt: "", species: "ON", mortalityCount: "1" });
 // Never in the future, beyond a few minutes' grace for a device clock ahead of the server's.
 const fromNow = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
-bad(mortalitySchema, { recordedAt: fromNow(60), mortalityCount: "1" });
-ok(mortalitySchema, { recordedAt: fromNow(1), mortalityCount: "1" });
+bad(mortalitySchema, { recordedAt: fromNow(60), species: "ON", mortalityCount: "1" });
+ok(mortalitySchema, { recordedAt: fromNow(1), species: "ON", mortalityCount: "1" });
 
 // The device-made id is required on save: without it a resend would be stored twice.
-bad(mortalitySchema, { id: undefined, mortalityCount: "1" });
-bad(mortalitySchema, { id: "1", mortalityCount: "1" });
+bad(mortalitySchema, { id: undefined, species: "ON", mortalityCount: "1" });
+bad(mortalitySchema, { id: "1", species: "ON", mortalityCount: "1" });
 
 console.log("validation ranges OK");

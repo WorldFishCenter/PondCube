@@ -69,7 +69,7 @@ const NOT_SAVED: Record<NotSaved, string> = {
 };
 
 // A form on a Draft: shows it on mount and on a change of Draft (tabs unmount inactive forms; a Round's form stays), and
-// keeps each edit in it. `blank` must be module-level.
+// keeps each edit in it. `blank` must be stable (module-level or memoised).
 export function useDraftForm<TValues extends FieldValues, TRecord = TValues>(
   draft: Pick<Draft, "restore" | "change" | "muted">,
   blank: () => TValues, // empty number fields are "": reset() with undefined leaves inputs filled
@@ -87,7 +87,7 @@ export function useDraftForm<TValues extends FieldValues, TRecord = TValues>(
   return form;
 }
 
-// A record form on this pond's Draft (lib/draft.ts); Save hands it to the Outbox. `blank` must be module-level.
+// A record form on this pond's Draft (lib/draft.ts); Save hands it to the Outbox. `blank` must be stable.
 export function useRecordForm<K extends RecordKind, TValues extends FieldValues, TRecord extends { id: string }>({
   kind,
   schema,

@@ -1,9 +1,9 @@
-import { getTableColumns } from "drizzle-orm";
+import { getTableColumns, sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import type { AnyPgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
-import { wqReadings, feedingEvents, mortalityEvents, samplingEvents, fishMeasurements } from "./schema";
-import { RECORD_KINDS, samplingSchema, type RecordKind } from "./validation";
+import { wqReadings, feedingEvents, mortalityEvents, samplingEvents, fishMeasurements, pond } from "./schema";
+import { mortalityBeforeSpecies, RECORD_KINDS, samplingSchema, type RecordKind } from "./validation";
 
 // Record intake: validate a record of a given kind and persist it, all-or-nothing.
 //   createRecordIntake(write, appVersion).save(kind, input, person)
@@ -43,10 +43,20 @@ export function createRecordIntake(write: AtomicWriter, appVersion: string) {
       if (!Object.hasOwn(RECORD_KINDS, kind)) throw new Error(`Unknown record kind: ${String(kind)}`);
       const record = { ...(input as object), person };
       if (kind === "sampling") return write(samplingInserts(samplingSchema.parse(record), appVersion));
+      if (kind === "mortality" && !("species" in record)) {
+        const before = mortalityBeforeSpecies.parse(record);
+        return write([
+          { table: mortalityEvents, rows: [{ ...before, species: onlySpecies(before.pondCode), appVersion }] },
+        ]);
+      }
       return write([{ table: TABLES[kind], rows: [{ ...RECORD_KINDS[kind].save.parse(record), appVersion }] }]);
     },
   };
 }
+
+// A Mortality record saved before species was asked: its pond's species when the pond lists exactly one, else none.
+const onlySpecies = (pondCode: string) =>
+  sql`(select ${pond.species}[1] from ${pond} where ${pond.pondCode} = ${pondCode} and cardinality(${pond.species}) = 1)`;
 
 // A sampling event and its fish measurements, in one write.
 function samplingInserts({ fish, ...event }: z.output<typeof samplingSchema>, appVersion: string): Insert[] {
