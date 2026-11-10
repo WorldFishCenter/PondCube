@@ -30,6 +30,8 @@ async function main() {
   });
   await db.insert(schema.pond).values([pond("PEN-FT1-001", "PEN", "Fish Tank 1"), pond("TAL_07", "TAL", "Pond")]);
   await db.insert(schema.feed).values({ feed: "SUP", sites: ["PEN", "TAL"] });
+  await db.insert(schema.fert).values({ fert: "UREA", sites: ["PEN", "TAL"] });
+  await db.insert(schema.treatment).values({ treatment: "Lime", sites: ["PEN", "TAL"] });
   await db.insert(schema.species).values({ species: "ON", speciesLatin: "Oreochromis niloticus" });
   // Every Record kind at both sites.
   for (const [pondCode, recordedAt] of [
@@ -39,6 +41,8 @@ async function main() {
     const at = { pondCode, recordedAt, person: "Ana", appVersion: "0.10.0" };
     await db.insert(schema.wqReadings).values({ ...at, period: "morning", dissolvedOxygen: 6.5, temperature: 29 });
     await db.insert(schema.feedingEvents).values({ ...at, feed: "SUP", feedWeight: 2000 });
+    await db.insert(schema.fertiliserEvents).values({ ...at, fert: "UREA", fertWeight: 50000 });
+    await db.insert(schema.treatmentEvents).values({ ...at, treatment: "Lime", treatmentWeight: 12000.5 });
     await db
       .insert(schema.mortalityEvents)
       .values({ ...at, species: "ON", pit: "00075D5F96", mortalityCount: 1, causeDeath: "Unknown" });
@@ -149,6 +153,19 @@ async function main() {
   ]);
   const [death] = await readRows(db, "mortality", ["TAL"]);
   assert.deepEqual([death.species, death.pit, death.mortality_count], ["ON", "00075D5F96", 1]);
+
+  // Fertiliser and treatment files: laid out like the feeding file, the item and its grams in place of the feed's.
+  const like = (item: string, weight: string) =>
+    columnsOf("feeding").map((c) => ({ feed: item, feed_weight: weight })[c] ?? c);
+  assert.deepEqual(columnsOf("fertiliser"), like("fert", "fert_weight"));
+  assert.deepEqual(columnsOf("treatment"), like("treatment", "treatment_weight"));
+  assert.equal(
+    await new Response(csv(columnsOf("treatment"), rowsByYear(db, "treatment", ["TAL"]))).text(),
+    "SITE,DATE,TIME,AREA,TANK,POND,TREATMENT,TREATMENT_WEIGHT,REMARKS,PERSON,SOURCE\r\n" +
+      "TAL,20261029,23:30,Pond,7,TAL_07,Lime,12000.5,,Ana,app\r\n",
+  );
+  const [fert] = await readRows(db, "fertiliser", ["PEN"]);
+  assert.deepEqual([fert.pond, fert.fert, fert.fert_weight, fert.date], ["PEN-FT1-001", "UREA", 50000, "20261030"]);
 
   // Data links: a key per sign-in account, worked out on every request as at sign-in.
   await db.insert(schema.operators).values([

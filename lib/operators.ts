@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
-import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
-import { feed, operators, pond } from "./schema";
+import type { AnyPgColumn, PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import { feed, fert, operators, pond, treatment } from "./schema";
 
 // Operator access: a signed-in account is an Operator when its verified primary email matches an
 // active operator (emails are edited in Airtable and synced). The match names the Person and the
@@ -40,20 +40,28 @@ export async function findOperator(db: PgDatabase<PgQueryResultHKT>, email: stri
   return row ?? null;
 }
 
-/** Why an Operator with these sites can't record this Record, or null: its pond must be at one, its feed used there. */
+/** Why an Operator with these sites can't record this Record, or null: its pond must be at one, and its feed,
+ * fertiliser or treatment used there. */
 export async function refusal(
   db: PgDatabase<PgQueryResultHKT>,
   sites: string[],
-  record: { pondCode?: unknown; feed?: unknown } | null,
+  record: { pondCode?: unknown; feed?: unknown; fert?: unknown; treatment?: unknown } | null,
 ): Promise<string | null> {
   const pondCode = String(record?.pondCode);
-  const feedCode = record?.feed ? String(record.feed) : "";
-  // One round trip: the pond's site, and the feed when that site uses it.
+  const code = (v: unknown) => (v ? String(v) : "");
+  const [feedCode, fertCode, treatmentCode] = [code(record?.feed), code(record?.fert), code(record?.treatment)];
+  const usedHere = (column: AnyPgColumn, sitesColumn: AnyPgColumn, value: string) =>
+    and(eq(column, value), sql`${pond.site} = any(${sitesColumn})`);
+  // One round trip: the pond's site, and each item named when that site uses it.
   const [here] = await db
-    .select({ site: pond.site, feed: feed.feed })
+    .select({ site: pond.site, feed: feed.feed, fert: fert.fert, treatment: treatment.treatment })
     .from(pond)
-    .leftJoin(feed, and(eq(feed.feed, feedCode), sql`${pond.site} = any(${feed.sites})`))
+    .leftJoin(feed, usedHere(feed.feed, feed.sites, feedCode))
+    .leftJoin(fert, usedHere(fert.fert, fert.sites, fertCode))
+    .leftJoin(treatment, usedHere(treatment.treatment, treatment.sites, treatmentCode))
     .where(eq(pond.pondCode, pondCode));
   if (!here || !sites.includes(here.site)) return `Pond ${pondCode} isn't at your site`;
-  return feedCode && !here.feed ? `Feed ${feedCode} isn't used at this pond's site` : null;
+  if (feedCode && !here.feed) return `Feed ${feedCode} isn't used at this pond's site`;
+  if (fertCode && !here.fert) return `Fertiliser ${fertCode} isn't used at this pond's site`;
+  return treatmentCode && !here.treatment ? `Treatment ${treatmentCode} isn't used at this pond's site` : null;
 }

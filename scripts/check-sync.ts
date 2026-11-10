@@ -192,6 +192,41 @@ async function main() {
   await synced({ feeds: [{ feed: "NAT", site: ["recPEN"] }] });
   assert.deepEqual((await feedRow("SUP"))?.sites, [], "removed from Airtable: kept, offered nowhere");
 
+  // Fertilisers (DMS FERT, up to four characters) and treatments (the pond book's names) link to sites the same way.
+  const fertRow = async (code: string) => (await db.select().from(schema.fert).where(eq(schema.fert.fert, code)))[0];
+  const treatmentRow = async (name: string) =>
+    (await db.select().from(schema.treatment).where(eq(schema.treatment.treatment, name)))[0];
+  await fails({ fertilisers: [{ fert: "UREAS", site: ["recTAL"] }] }, /should be up to four characters/);
+  await fails({ fertilisers: [{ note_fert: "Urea", site: ["recTAL"] }] }, /fert is empty/);
+  await fails({ fertilisers: [{ fert: "TSP", site: ["recXX"] }] }, /should link to rows of sites/);
+  await fails({ treatments: [{ note_treatment: "Calcium carbonate" }] }, /treatment is empty/);
+  await fails({ treatments: [{ treatment: "Lime" }, { treatment: "lime " }] }, /duplicate of treatments row 1/);
+  // A problem in either list writes nothing, feeds and ponds included.
+  await fails({ feeds: [{ feed: "NAT", site: ["recPEN"] }], fertilisers: [{ fert: "UREAS" }] }, /four characters/);
+  const lists = await prepared({
+    sites: [pen, tal],
+    fertilisers: [
+      { fert: "UREA", note_fert: "Urea", site: ["recTAL"] },
+      { fert: "YEAS", site: ["recTAL"] },
+    ],
+    treatments: [{ treatment: " Lime ", note_treatment: "Calcium carbonate", site: ["recTAL"] }],
+  });
+  assert.deepEqual(lists.summary, [
+    "Sites: 2 in Airtable → 0 new, 2 updated",
+    "Fertilisers: 2 in Airtable → 2 new, 0 updated",
+    "Treatments: 1 in Airtable → 1 new, 0 updated",
+  ]);
+  await lists.write();
+  assert.deepEqual(await fertRow("UREA"), { fert: "UREA", noteFert: "Urea", sites: ["TAL"] });
+  assert.deepEqual(await treatmentRow("Lime"), {
+    treatment: "Lime",
+    noteTreatment: "Calcium carbonate",
+    sites: ["TAL"],
+  });
+  await synced({ sites: [pen, tal], fertilisers: [{ fert: "UREA", site: ["recTAL"] }], treatments: [] });
+  assert.deepEqual((await fertRow("YEAS"))?.sites, [], "removed from Airtable: kept, offered nowhere");
+  assert.deepEqual((await treatmentRow("Lime"))?.sites, [], "an empty treatments table empties every list");
+
   await client.close();
   console.log("airtable sync OK");
 }

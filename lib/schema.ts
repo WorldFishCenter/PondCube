@@ -44,6 +44,20 @@ export const feed = pgTable("feed", {
   sites: text("sites").array().notNull(), // the sites that use it
 });
 
+// ---- Fertilisers (mirrors the Airtable fertilisers table; WorldFish DMS v5 fert load file) ----
+export const fert = pgTable("fert", {
+  fert: text("fert").primaryKey(), // up to four characters, e.g. UREA
+  noteFert: text("note_fert"),
+  sites: text("sites").array().notNull(), // the sites that use it; empty once removed from Airtable, as for feed
+});
+
+// ---- Treatments (mirrors the Airtable treatments table): the pond book's, not the DMS's progeny-test treatment ----
+export const treatment = pgTable("treatment", {
+  treatment: text("treatment").primaryKey(), // the pond book's name, e.g. Lime
+  noteTreatment: text("note_treatment"),
+  sites: text("sites").array().notNull(), // as for feed
+});
+
 // ---- Ponds (mirrors the Airtable ponds table; WorldFish DMS v5 names where it has one) ----
 export const pond = pgTable("pond", {
   pondCode: text("pond_code").primaryKey(), // DMS SITE_POND, e.g. TAL_01; Penang still PEN-FT3-091
@@ -122,6 +136,39 @@ export const feedingEvents = pgTable("feeding_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ---- Events: fertiliser and treatment, shaped like feeding (the pond book: up to 3 of each a day) ----
+export const fertiliserEvents = pgTable("fertiliser_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  pondCode: text("pond_code")
+    .notNull()
+    .references(() => pond.pondCode),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+  fert: text("fert")
+    .notNull()
+    .references(() => fert.fert),
+  fertWeight: doublePrecision("fert_weight").notNull(), // g
+  remarks: text("remarks"),
+  person: text("person").notNull(),
+  appVersion: text("app_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const treatmentEvents = pgTable("treatment_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  pondCode: text("pond_code")
+    .notNull()
+    .references(() => pond.pondCode),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+  treatment: text("treatment")
+    .notNull()
+    .references(() => treatment.treatment),
+  treatmentWeight: doublePrecision("treatment_weight").notNull(), // g
+  remarks: text("remarks"),
+  person: text("person").notNull(),
+  appVersion: text("app_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ---- Event: mortality ----
 export const mortalityEvents = pgTable("mortality_events", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -186,6 +233,9 @@ export const PROVISIONAL = {
   nitrate: "nitrate",
   remarks: "remarks",
   feed_weight: "feed_weight", // g; the pond book's FEED n WEIGHT
+  fert_weight: "fert_weight", // g; the pond book's FERTILISER n WEIGHT
+  treatment: "treatment", // the pond book's; the DMS's treatment is a progeny-test design
+  treatment_weight: "treatment_weight", // g; the pond book's TREATMENT n WEIGHT
   mortality_count: "mortality_count",
   pit: "pit", // the pond book's; the DMS names a tagged fish INDIV (spawn round + PIT)
   sampling_event: "sampling_event", // the Sampling event's id, shared by its Fish measurements
@@ -290,6 +340,44 @@ export const feedingView = pgView("export_feeding").as((qb) =>
       .from(feedingEvents)
       .$dynamic(),
     feedingEvents.pondCode,
+  ),
+);
+
+export const fertiliserView = pgView("export_fertiliser").as((qb) =>
+  atPond(
+    qb
+      .select(
+        named({
+          ...recordFields(fertiliserEvents),
+          ...pondFields,
+          fert: fertiliserEvents.fert,
+          [P.fert_weight]: fertiliserEvents.fertWeight,
+          [P.remarks]: fertiliserEvents.remarks,
+          ...madeBy(fertiliserEvents),
+        }),
+      )
+      .from(fertiliserEvents)
+      .$dynamic(),
+    fertiliserEvents.pondCode,
+  ),
+);
+
+export const treatmentView = pgView("export_treatment").as((qb) =>
+  atPond(
+    qb
+      .select(
+        named({
+          ...recordFields(treatmentEvents),
+          ...pondFields,
+          [P.treatment]: treatmentEvents.treatment,
+          [P.treatment_weight]: treatmentEvents.treatmentWeight,
+          [P.remarks]: treatmentEvents.remarks,
+          ...madeBy(treatmentEvents),
+        }),
+      )
+      .from(treatmentEvents)
+      .$dynamic(),
+    treatmentEvents.pondCode,
   ),
 );
 

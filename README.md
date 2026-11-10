@@ -32,13 +32,16 @@ PondCube Collect exists to make those observations:
 **One place, one pond, one observation at a time.** An operator opens the app,
 says who they are and which pond they're standing at, and records what they see.
 
-The four kinds of observation:
+The six kinds of observation:
 
 - **Water quality** — dissolved oxygen and temperature, plus pH, ammonia, nitrite
   and nitrate when taken, logged for the morning or afternoon round. Taken in rounds through an area: two readings,
   Save, and on to the next pond.
 - **Feeding** — each feed that went into the pond (from the site's own list) and its
   weight in grams, as the pond book records it.
+- **Fertiliser** and **Treatment** — each fertiliser or treatment (lime, salt,
+  antiparasitics) that went into the pond, from the site's own list, and its weight
+  in grams. Only at sites that keep these lists; Penang has none.
 - **Mortality** — how many fish were removed dead, and the cause of death.
 - **Sampling** — a batch of individual fish weights and standard lengths, captured
   together as one sampling event.
@@ -48,7 +51,8 @@ The four kinds of observation:
 - **Every pond at your site, found fast.** Each person sees the ponds of their own
   site — at Penang, 296 coded earthen ponds, fish tanks, hatchery and storage
   tanks — searchable from one picker, so the right pond is two taps away.
-- **Ready for more sites.** Each site keeps its own ponds, people and feed list, so
+- **Ready for more sites.** Each site keeps its own ponds, people and lists of
+  feeds, fertilisers and treatments, so
   another WorldFish site can start using the app without changing it.
 - **Built for a phone at the pondside.** Large touch targets, a layout that works
   one-handed, and no fiddly controls.

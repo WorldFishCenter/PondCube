@@ -22,6 +22,8 @@ import { PondCombobox, type Pond } from "./pond-combobox";
 import { FILLED_TAB, RecordedAtField, type RecordFormProps } from "./record-form";
 import { WaterRound } from "./water-round";
 import { FeedingForm, type Feed } from "./feeding-form";
+import { FertiliserForm, type Fert } from "./fertiliser-form";
+import { TreatmentForm, type Treatment } from "./treatment-form";
 import { MortalityForm, type Species } from "./mortality-form";
 import { SamplingForm } from "./sampling-form";
 
@@ -29,15 +31,15 @@ const POND_KEY = "pondcube:lastPond";
 const RECORDED_AT_KEY = "pondcube:recordedAt"; // kept so a refresh mid-record doesn't lose it
 
 // One tab per Record kind (lib/validation.ts RECORD_KINDS; the compiler flags a missing one), in tab order. Each form
-// owns its fields and its kind's draft; only the Feeding form uses `feeds`, only Mortality `species`. Water is a Round.
+// owns its fields and its kind's draft, and takes only its own list (Feeding `feeds`, …). Water is a Round.
+type Lists = { feeds: Feed[]; ferts: Fert[]; treatments: Treatment[]; species: Species[] };
 const FORMS = {
   feeding: { label: "Feeding", Form: FeedingForm },
+  fertiliser: { label: "Fertiliser", Form: FertiliserForm },
+  treatment: { label: "Treatment", Form: TreatmentForm },
   mortality: { label: "Mortality", Form: MortalityForm },
   sampling: { label: "Sampling", Form: SamplingForm },
-} satisfies Record<
-  Exclude<RecordKind, "wq">,
-  { label: string; Form: React.ComponentType<RecordFormProps & { feeds: Feed[]; species: Species[] }> }
->;
+} satisfies Record<Exclude<RecordKind, "wq">, { label: string; Form: React.ComponentType<RecordFormProps & Lists> }>;
 const TABS = { wq: { label: "Water" }, ...FORMS } satisfies Record<RecordKind, { label: string }>;
 
 export function Shell({ person, children }: { person?: string; children: React.ReactNode }) {
@@ -90,6 +92,8 @@ export function CollectionApp({
   sites,
   ponds,
   feeds,
+  ferts,
+  treatments,
   species,
   version,
 }: {
@@ -98,6 +102,8 @@ export function CollectionApp({
   sites: string[];
   ponds: (Pond & { species: string[] })[];
   feeds: (Feed & { sites: string[] })[];
+  ferts: (Fert & { sites: string[] })[];
+  treatments: (Treatment & { sites: string[] })[];
   species: Species[];
   version: string;
 }) {
@@ -106,7 +112,11 @@ export function CollectionApp({
   const pond = ponds.find((p) => p.pondCode === chosenPond);
   const pondCode = pond?.pondCode ?? "";
   const site = pond?.site;
-  const feedsHere = feeds.filter((f) => site && f.sites.includes(site)); // the chosen pond's site's feeds
+  const here = <T extends { sites: string[] }>(list: T[]) => list.filter((i) => site && i.sites.includes(site));
+  // A Fertiliser or Treatment tab only for an Operator whose sites have that list (Penang has neither).
+  const unlisted: Partial<Record<RecordKind, boolean>> = { fertiliser: !ferts.length, treatment: !treatments.length };
+  const tabs = Object.entries(TABS).filter(([kind]) => !unlisted[kind as RecordKind]);
+  const forms = Object.entries(FORMS).filter(([kind]) => !unlisted[kind as RecordKind]);
   const speciesHere = pond?.species.length ? species.filter((s) => pond.species.includes(s.species)) : species;
   const [recordedAt, setRecordedAt] = React.useState("");
   const [restored, setRestored] = React.useState(false);
@@ -157,8 +167,9 @@ export function CollectionApp({
         <TabsSkeleton />
       ) : (
         <Tabs value={kind} onValueChange={setKind}>
-          <TabsList className="w-full">
-            {Object.entries(TABS).map(([value, { label }]) => (
+          {/* Six tabs don't fit a phone's width: they wrap. */}
+          <TabsList className="w-full flex-wrap group-data-horizontal/tabs:h-auto">
+            {tabs.map(([value, { label }]) => (
               <TabsTrigger key={value} value={value} className={FILLED_TAB}>
                 {label}
               </TabsTrigger>
@@ -180,7 +191,7 @@ export function CollectionApp({
             </FieldGroup>
             <WaterRound ponds={ponds} paperAt={paperAt} outbox={outbox} onPond={choosePond} />
           </TabsContent>
-          {Object.entries(FORMS).map(([value, { Form }]) => (
+          {forms.map(([value, { Form }]) => (
             <TabsContent key={value} value={value} className="flex flex-col gap-2">
               <Card>
                 <CardContent>
@@ -200,7 +211,9 @@ export function CollectionApp({
                   pondCode={pondCode}
                   recordedAt={when}
                   outbox={outbox}
-                  feeds={feedsHere}
+                  feeds={here(feeds)}
+                  ferts={here(ferts)}
+                  treatments={here(treatments)}
                   species={speciesHere}
                 />
               ) : (
@@ -216,7 +229,7 @@ export function CollectionApp({
         </Tabs>
       )}
       <div className="flex flex-wrap justify-center">
-        <DataSheet sites={sites} kinds={TABS} />
+        <DataSheet sites={sites} kinds={Object.fromEntries(tabs)} />
         <FeedbackSheet operator={person} version={version} />
       </div>
     </Shell>

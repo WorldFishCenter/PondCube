@@ -49,6 +49,12 @@ async function main() {
     { feed: "SUP", sites: ["PEN"] },
     { feed: "NAT", sites: ["TAL"] },
   ]);
+  await db.insert(schema.pond).values({ ...pond, pondCode: "TAL_01", site: "TAL" });
+  await db.insert(schema.fert).values([
+    { fert: "UREA", sites: ["TAL"] },
+    { fert: "GONE", sites: [] }, // removed from Airtable
+  ]);
+  await db.insert(schema.treatment).values({ treatment: "Lime", sites: ["TAL"] });
   const refused = (record: object) => refusal(db, ana.sites, record);
   assert.equal(await refused({ pondCode: "PEN-FT1-001" }), null);
   assert.equal(await refused({ pondCode: "KOT-PND-001" }), "Pond KOT-PND-001 isn't at your site");
@@ -61,6 +67,23 @@ async function main() {
     "Feed NAT isn't used at this pond's site",
     "a feed of another of the Operator's sites",
   );
+  // Fertilisers and treatments the same way: each site its own list (Penang has none).
+  assert.equal(await refused({ pondCode: "TAL_01", fert: "UREA" }), null);
+  assert.equal(await refused({ pondCode: "TAL_01", treatment: "Lime" }), null);
+  assert.equal(
+    await refused({ pondCode: "PEN-FT1-001", fert: "UREA" }),
+    "Fertiliser UREA isn't used at this pond's site",
+  );
+  assert.equal(
+    await refused({ pondCode: "PEN-FT1-001", treatment: "Lime" }),
+    "Treatment Lime isn't used at this pond's site",
+  );
+  assert.equal(await refused({ pondCode: "TAL_01", fert: "GONE" }), "Fertiliser GONE isn't used at this pond's site");
+  assert.equal(
+    await refused({ pondCode: "TAL_01", treatment: "Salt" }),
+    "Treatment Salt isn't used at this pond's site",
+  );
+  assert.equal(await refused({ pondCode: "KOT-PND-001", fert: "UREA" }), "Pond KOT-PND-001 isn't at your site");
 
   await client.close();
   console.log("operator access OK");

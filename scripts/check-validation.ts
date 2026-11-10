@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   waterQualitySchema,
   feedingSchema,
+  fertiliserSchema,
+  treatmentSchema,
   mortalityBeforeSpecies,
   mortalityForm,
   mortalitySchema,
@@ -74,6 +76,20 @@ bad(feedingSchema, { feed: "SUP", feedWeight: "-1" });
 bad(feedingSchema, { feed: "SUP", feedWeight: "" });
 bad(feedingSchema, { feedWeight: "500" }); // the Feed is required
 bad(feedingSchema, { feed: "", feedWeight: "500" });
+
+// One Fertiliser or Treatment and its weight: over 0, up to the pond book's 100,000 g.
+ok(fertiliserSchema, { fert: "UREA", fertWeight: "100000" });
+ok(fertiliserSchema, { fert: "UREA", fertWeight: "0,5" });
+bad(fertiliserSchema, { fert: "UREA", fertWeight: "100000.5" });
+bad(fertiliserSchema, { fert: "UREA", fertWeight: "0" });
+bad(fertiliserSchema, { fert: "UREA", fertWeight: "" });
+bad(fertiliserSchema, { fert: "UREA", fertWeight: "2,500" }); // could be thousands
+bad(fertiliserSchema, { fertWeight: "500" }); // the Fertiliser is required
+ok(treatmentSchema, { treatment: "Lime", treatmentWeight: "100000" });
+bad(treatmentSchema, { treatment: "Lime", treatmentWeight: "100001" });
+bad(treatmentSchema, { treatment: "Lime", treatmentWeight: "-1" });
+bad(treatmentSchema, { treatment: "", treatmentWeight: "500" }); // the Treatment is required
+assert.equal(treatmentSchema.parse({ ...base, treatment: "Lime", treatmentWeight: "1500" }).treatmentWeight, 1500);
 
 ok(mortalitySchema, { species: "ON", mortalityCount: "0" });
 bad(mortalitySchema, { species: "ON", mortalityCount: "-1" });

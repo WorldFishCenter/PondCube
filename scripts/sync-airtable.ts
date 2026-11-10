@@ -6,29 +6,42 @@ import { drizzle } from "drizzle-orm/neon-http";
 import type { PgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { normaliseEmail } from "../lib/operators";
-import { feed, pond, operators, site, species } from "../lib/schema";
+import { feed, fert, pond, operators, site, species, treatment } from "../lib/schema";
 
-// Airtable is where people edit sites, species, feeds, ponds and operators; this copies them one way into Neon.
+// Airtable is where people edit sites, species, feeds, fertilisers, treatments, ponds and operators; this copies them
+// one way into Neon.
 // Every row is checked first and nothing is written unless all pass. The write is all-or-nothing:
-// upsert, then retire ponds / feeds / deactivate operators no longer in Airtable. Nothing is deleted,
+// upsert, then retire ponds / site lists / deactivate operators no longer in Airtable. Nothing is deleted,
 // since records reference them. Usage: npm run db:sync [-- --prod]  (or db:sync-ponds / -operators)
 const BASE_ID = "appPU5BJLdsjbn49o"; // PondCube base
 
 type Fields = Record<string, unknown>;
-/** Each row carries its Airtable record `id`: ponds, operators and feeds link to sites and species by it. */
+/** Each row carries its Airtable record `id`: ponds, operators and site lists link to sites and species by it. */
 export type AirtableRows = {
   sites?: Fields[];
   species?: Fields[];
   feeds?: Fields[];
+  fertilisers?: Fields[];
+  treatments?: Fields[];
   ponds?: Fields[];
   operators?: Fields[];
 };
 type Site = typeof site.$inferInsert;
 type Species = typeof species.$inferInsert;
 type Feed = typeof feed.$inferInsert;
+type Fert = typeof fert.$inferInsert;
+type Treatment = typeof treatment.$inferInsert;
 type Pond = typeof pond.$inferInsert;
 type Operator = typeof operators.$inferInsert;
-type SyncPlan = { sites?: Site[]; species?: Species[]; feeds?: Feed[]; ponds?: Pond[]; operators?: Operator[] };
+type SyncPlan = {
+  sites?: Site[];
+  species?: Species[];
+  feeds?: Feed[];
+  ferts?: Fert[];
+  treatments?: Treatment[];
+  ponds?: Pond[];
+  operators?: Operator[];
+};
 type Db = PgDatabase<PgQueryResultHKT>;
 
 /** The seam to the database: reads, plus one all-or-nothing write. Adapters: Neon batch (main), PGLite transaction (check-sync). */
@@ -172,6 +185,19 @@ const feedRow = z
   })
   .transform((r): Feed => ({ feed: r.feed, noteFeed: r.note_feed, sites: r.site }));
 
+const fertRow = z
+  .object({
+    fert: required.pipe(z.string().max(4, "should be up to four characters (DMS FERT), e.g. UREA")),
+    note_fert: optional,
+    site: siteLinks,
+  })
+  .transform((r): Fert => ({ fert: r.fert, noteFert: r.note_fert, sites: r.site }));
+
+// No DMS list: identified by the pond book's name, e.g. Lime.
+const treatmentRow = z
+  .object({ treatment: required, note_treatment: optional, site: siteLinks })
+  .transform((r): Treatment => ({ treatment: r.treatment, noteTreatment: r.note_treatment, sites: r.site }));
+
 // Links arrive as lists of record ids; unknown ones become "?" and fail their row's check.
 const resolve = (codes: Map<string, string>, v: unknown) =>
   Array.isArray(v) ? v.map((id) => codes.get(String(id)) ?? "?") : v;
@@ -203,6 +229,17 @@ function planSync(rows: AirtableRows): { plan: SyncPlan; problems: string[] } {
   const linkSites = (rows: Fields[]) =>
     rows.map((r) => ("site" in r ? { ...r, site: resolve(sites.codes, r.site) } : r));
   if (rows.feeds) plan.feeds = checkRows("feeds", "feed", linkSites(rows.feeds), feedRow, (f) => f.feed, problems);
+  if (rows.fertilisers)
+    plan.ferts = checkRows("fertilisers", "fert", linkSites(rows.fertilisers), fertRow, (f) => f.fert, problems);
+  if (rows.treatments)
+    plan.treatments = checkRows(
+      "treatments",
+      "treatment",
+      linkSites(rows.treatments),
+      treatmentRow,
+      (t) => t.treatment.toLowerCase(),
+      problems,
+    );
   if (rows.ponds) {
     const ponds = rows.ponds.map((p) => ({
       ...p,
@@ -297,6 +334,8 @@ async function describeSync(db: Db, plan: SyncPlan): Promise<string[]> {
   await upserted("Sites", site, site.site, plan.sites, (s) => s.site);
   await upserted("Species", species, species.species, plan.species, (s) => s.species);
   await upserted("Feeds", feed, feed.feed, plan.feeds, (f) => f.feed);
+  await upserted("Fertilisers", fert, fert.fert, plan.ferts, (f) => f.fert);
+  await upserted("Treatments", treatment, treatment.treatment, plan.treatments, (t) => t.treatment);
   return lines;
 }
 
@@ -316,6 +355,16 @@ function syncQueries(db: Db, plan: SyncPlan): BatchItem<"pg">[] {
     // Removed from Airtable: offered nowhere, kept for the records that reference it.
     const codes = plan.feeds.map((f) => f.feed);
     queries.push(db.update(feed).set({ sites: [] }).where(notInArray(feed.feed, codes)));
+  }
+  if (plan.ferts) {
+    if (plan.ferts.length) queries.push(upsert(fert, fert.fert, plan.ferts));
+    const codes = plan.ferts.map((f) => f.fert);
+    queries.push(db.update(fert).set({ sites: [] }).where(notInArray(fert.fert, codes)));
+  }
+  if (plan.treatments) {
+    if (plan.treatments.length) queries.push(upsert(treatment, treatment.treatment, plan.treatments));
+    const names = plan.treatments.map((t) => t.treatment);
+    queries.push(db.update(treatment).set({ sites: [] }).where(notInArray(treatment.treatment, names)));
   }
   if (plan.ponds) {
     const codes = plan.ponds.map((p) => p.pondCode);
@@ -395,14 +444,19 @@ async function main() {
     throw new Error(`Unknown table "${only}". Use: ponds, operators`);
 
   const target = neonTarget(prod);
-  const [siteRows, speciesRows, feeds, ponds, ops] = await Promise.all([
-    fetchTable("sites"), // ponds, operators and feeds link to sites
+  const [siteRows, speciesRows, feeds, fertilisers, treatments, ponds, ops] = await Promise.all([
+    fetchTable("sites"), // ponds, operators and site lists link to sites
     only === "operators" ? undefined : fetchTable("species"),
     only ? undefined : fetchTable("feeds"),
+    only ? undefined : fetchTable("fertilisers"),
+    only ? undefined : fetchTable("treatments"),
     only === "operators" ? undefined : fetchTable("ponds"),
     only === "ponds" ? undefined : fetchTable("operators"),
   ]);
-  const sync = await prepareSync({ sites: siteRows, species: speciesRows, feeds, ponds, operators: ops }, target);
+  const sync = await prepareSync(
+    { sites: siteRows, species: speciesRows, feeds, fertilisers, treatments, ponds, operators: ops },
+    target,
+  );
   if ("problems" in sync)
     throw new Error(`Nothing written. Fix these in Airtable, then re-run:\n- ${sync.problems.join("\n- ")}`);
   console.log(sync.summary.join("\n"));

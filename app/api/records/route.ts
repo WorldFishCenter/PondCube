@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   const { kind, account, record } = await request.json();
   // Signed out, or signed in as someone other than whoever saved it: never stored under their name.
   if (access === "signedOut" || account !== access.account) return new Response(null, { status: 401 });
-  // Only the ponds of the Operator's own sites, and their feeds; refused as this Record's problem, the others still send.
+  // Only the ponds of the Operator's own sites, and their lists; refused as this Record's problem, the others still send.
   const refused = await refusal(db, access.sites, record);
   if (refused) return new Response(refused, { status: 422 });
   try {

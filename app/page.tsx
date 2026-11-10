@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { signedInAccess } from "@/lib/access";
-import { getFeeds, getPonds, getSpecies } from "@/lib/data";
+import { getFeeds, getFerts, getPonds, getSpecies, getTreatments } from "@/lib/data";
 import { CollectionApp, CollectionSkeleton, Shell } from "@/components/collection/collection-app";
 import { NotOnListCard } from "@/components/collection/not-on-list-card";
 import { InstallPrompt } from "@/components/install-prompt";
@@ -24,7 +24,13 @@ async function App() {
         <NotOnListCard />
       </Shell>
     );
-  const [ponds, feeds, species] = await Promise.all([getPonds(access.sites), getFeeds(access.sites), getSpecies()]);
+  const [ponds, feeds, ferts, treatments, species] = await Promise.all([
+    getPonds(access.sites),
+    getFeeds(access.sites),
+    getFerts(access.sites),
+    getTreatments(access.sites),
+    getSpecies(),
+  ]);
   return (
     <CollectionApp
       person={access.operator}
@@ -32,6 +38,8 @@ async function App() {
       sites={access.sites}
       ponds={ponds}
       feeds={feeds}
+      ferts={ferts}
+      treatments={treatments}
       species={species}
       version={APP_VERSION}
     />

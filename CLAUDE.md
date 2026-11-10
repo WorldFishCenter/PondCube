@@ -1,7 +1,7 @@
 # PondCube Collect — project instructions
 
 Mobile/tablet-first field data collection for WorldFish PondCube (Penang HQ).
-Operators record four kinds of observation about aquaculture ponds and the app
+Operators record six kinds of observation about aquaculture ponds and the app
 writes them to a Neon Postgres database. Replaces the old Kobo/Excel flow.
 
 Read these alongside this file:
@@ -27,7 +27,7 @@ Hosted on Vercel (functions pinned to Singapore). Node 20+.
 | `npm run lint` / `typecheck`                  | ESLint / `tsc --noEmit`                                                                                                                                                                                                                                                                      |
 | `npm run check`                               | Self-checks: validation ranges, draft lifecycle, outbox, rounds, record intake, Airtable sync, operator access, legacy import, seeing the data, the .xlsx download — against in-memory Postgres (PGLite, no network); the .xlsx one opens files with openpyxl (python3 with openpyxl, or uv) |
 | `npm run db:push`                             | Apply the Drizzle schema to the branch in `DATABASE_URL`                                                                                                                                                                                                                                     |
-| `npm run db:sync`                             | Check, then copy sites + species + feeds + ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                                                                                                                                           |
+| `npm run db:sync`                             | Check, then copy sites + species + feeds + fertilisers + treatments + ponds + operators from Airtable into `DATABASE_URL` (all-or-nothing); `-- --prod` → `DATABASE_URL_PROD`                                                                                                                |
 | `npm run db:sync-ponds` / `db:sync-operators` | Same, sites + ponds (with species) or sites + operators only                                                                                                                                                                                                                                 |
 | `npm run db:import-legacy -- <csv>`           | One-off: legacy water-quality log (converted CSV) → `wq_readings`, checked, all-or-nothing; `-- --prod` as above                                                                                                                                                                             |
 
@@ -41,7 +41,7 @@ app/layout.tsx            Inter font (shadcn preset), viewport, ClerkProvider (s
 app/sign-in               Clerk's sign-in page (sign-in-or-up, no sign-up page); proxy.ts = clerkMiddleware (routes stay public)
 app/api/records/route.ts  Where the Outbox sends each Record (POST); Person = signed-in operator
 app/api/download/route.ts Water-quality download: one site + month as .xlsx (GET, signed in)
-app/api/data/[file]/route.ts   Data link CSVs (wq|feeding|mortality|sampling|ponds .csv?key=…), streamed
+app/api/data/[file]/route.ts   Data link CSVs (wq|feeding|fertiliser|treatment|mortality|sampling|ponds .csv?key=…), streamed
 app/api/data-link/route.ts     Makes the signed-in account's data link key (POST), replacing the old one
 app/globals.css           shadcn theme tokens (incl. --logo-outline) + 44px touch-target rule
 app/icon.svg              Favicon (outline follows OS theme); apple-icon.png = iOS home screen
@@ -57,7 +57,7 @@ components/steps.tsx      Numbered instructions (install drawer, data sheet)
 components/sign-in-card.tsx  Clerk's sign-in, with the app's width and touch size (both sign-in routes)
 components/collection/*    App UI: shell (Operator's name, record kinds → tabs, Pond + date above the forms), not-on-list card, pond picker,
                           water-round.tsx = the Water tab, a Round through an Area (one form on the Pond reached, rows below);
-                          the 3 other forms, feedback sheet (Airtable form), data sheet ("Your data": download + data link);
+                          the 5 other forms (Fertiliser, Treatment: only for an Operator whose sites have that list), feedback sheet (Airtable form), data sheet ("Your data": download + data link);
                           record-form.tsx = shared form hooks (draft, save) + fields + STATUS, StatusBadge, FILLED_TAB;
                           outbox.tsx = sending to app/api/records + the "waiting to send" notice
 lib/schema.ts             Drizzle tables and export views (PROVISIONAL names) — the single source of truth for the data model
@@ -66,23 +66,25 @@ lib/workbook.ts           The water-quality .xlsx (write-excel-file, plus table 
 lib/validation.ts         zod: form side (device) + save side (server); RANGES; recorded-at rules; RECORD_KINDS; withNewNames() reads
                           Drafts and Outbox Records saved before 0.8.0
 lib/intake.ts             Record intake: validate + store a record of any kind, all-or-nothing; the caller names the Person
-lib/data.ts               Server-only cached reads (operator by email, a site's ponds and feeds)
+lib/data.ts               Server-only cached reads (operator by email, a site's ponds, feeds, fertilisers and treatments)
 lib/access.ts             Signed-in access, and a data link key's access: wires Clerk into lib/operators.ts (server-only)
 lib/operators.ts          Operator access: account → signed out / not on the list / Operator (with sites); refusal() = pond not at
-                          their sites or feed not used there; email normaliser (shared with sync)
+                          their sites or feed / fertiliser / treatment not used there; email normaliser (shared with sync)
 lib/storage.ts            Device storage seam (localStorage, guarded): Drafts, Outbox, Round marks, remembered pond and Recorded-at
 lib/draft.ts              Draft per record kind + pond: restore, change, submit to the Outbox (only that clears it; storage + keep injected)
 lib/outbox.ts             Outbox: saved Records waiting on the device, sent one at a time oldest first, removed only once stored (storage + send injected)
 lib/round.ts              A Round on the device: which one it is, how far it got (marks per day + Period), what a tap on Save or Skip comes to, what a Correction keeps (storage + clock + keep injected)
 lib/db.ts                 Neon HTTP + Drizzle client (server-only)
-lib/options.ts            Choice lists (periods, causes), the Period of a time, Areas in walking order, a pond code's number; feeds come from each site's list in the database
+lib/options.ts            Choice lists (periods, causes), the Period of a time, Areas in walking order, a pond code's number; feeds, fertilisers and treatments come from each site's list in the database
 lib/version.ts            App version from package.json (server-only: footer, feedback form)
-scripts/sync-airtable.ts  Airtable (PondCube base: sites, species, feeds, ponds, operators) → Neon, same tables
+scripts/sync-airtable.ts  Airtable (PondCube base: sites, species, feeds, fertilisers, treatments, ponds, operators) → Neon, same tables
 scripts/import-legacy.ts  One-off: legacy Excel log (converted CSV) → wq_readings; its decisions are in the file header
 scripts/migrate-0.8.0.sql One-off: production from 0.7.0 to 0.8.0 (DMS v3 renames, values kept); see docs/architecture.md
 scripts/migrate-0.10.0.sql One-off: each site's timezone and a changed view, before push (0.9.0 → 0.10.0)
 scripts/migrate-0.12.0.sql One-off: a pond's species become a list; area_code, zone optional; before push (0.11.0 → 0.12.0)
 scripts/migrate-0.12.0-feeding.sql One-off, after it: a Feeding event is one Feed + grams (feed_weight), no feedings count
+scripts/migrate-0.12.0-mortality.sql One-off, after it: a Mortality record's species and PIT (nullable columns, a changed view)
+scripts/migrate-0.12.0-inputs.sql One-off, after those: Fertiliser and Treatment events + their site lists (new tables, views)
 scripts/check-*.ts        The self-checks run by `npm run check` (fake-storage.ts: their storage adapters; xlsx-dump.py: openpyxl)
 ```
 

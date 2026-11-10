@@ -59,8 +59,8 @@ One observation a Person makes about a Pond at a Recorded-at instant.
 _Avoid_: entry, submission, row
 
 **Record kind**
-Which of the four kinds a Record is: Water-quality reading, Feeding event,
-Mortality record or Sampling event.
+Which of the six kinds a Record is: Water-quality reading, Feeding event, Fertiliser event, Treatment event,
+Mortality record or Sampling event. Fertiliser and Treatment events are recorded only at Sites with that list.
 _Avoid_: record type, form, tab
 
 **Water-quality reading**
@@ -88,6 +88,27 @@ _Avoid_: feed type
 One Feed given to a Pond and its weight in grams (over 0, up to 15,000 g), as the pond book records each feed of a
 day. Two Feeds the same day are two Feeding events.
 _Avoid_: feed log, amount fed
+
+**Fertiliser**
+A fertiliser used at a Site, identified by up to four characters (`FERT` in the WorldFish DMS v5), e.g. `UREA`; each
+Site has its own list, and a Site without one records no Fertiliser events.
+_Avoid_: fertiliser type, fert type
+
+**Fertiliser event**
+One Fertiliser given to a Pond and its weight in grams (over 0, up to 100,000 g), as the pond book records each
+fertiliser of a day. Two Fertilisers the same day are two Fertiliser events.
+_Avoid_: fertilisation, fertiliser log
+
+**Treatment**
+A treatment used at a Site (lime, salt, an antiparasitic…), identified by the pond book's name, e.g. Lime; each Site
+has its own list, and a Site without one records no Treatment events. Not the DMS's `treatment`, which is a
+progeny-test design.
+_Avoid_: chemical, medication, treatment type
+
+**Treatment event**
+One Treatment given to a Pond and its weight in grams (over 0, up to 100,000 g), as the pond book records each
+treatment of a day. Two Treatments the same day are two Treatment events.
+_Avoid_: dosing, treatment log
 
 **Mortality record**
 A count of dead fish of one Species removed from a Pond, optionally with a cause of death (one of the DMS's eleven).

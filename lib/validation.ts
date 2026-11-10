@@ -26,6 +26,8 @@ export const RANGES = {
   wt: [0, 20000], // DMS trait WT, g (Range from the v3 trait table)
   lenSt: [0, 100], // DMS v5 trait LEN_ST, cm
   feedWeight: [0, 15000], // g of one Feed per day: the 2025 pond book's bound
+  fertWeight: [0, 100000], // g of one Fertiliser per day: the pond book's bound
+  treatmentWeight: [0, 100000], // g of one Treatment per day: the pond book's bound
 } as const;
 
 // Optional decimal. int: counts map to integer DB columns, so reject decimals here rather than at insert.
@@ -96,16 +98,34 @@ export const waterQualityForm = z.object({
 });
 export const waterQualitySchema = waterQualityForm.extend(forSave);
 
+// Feeding, Fertiliser and Treatment events: one item of the pond's site's list (refusal() checks that) and its grams.
+const picked = (what: string) => z.string({ error: `Select a ${what}` }).min(1, `Select a ${what}`);
+const grams = (range: readonly [number, number], label: string) =>
+  reqNum(...range, label).refine((v) => v !== 0, `${label} must be more than 0`);
+
 export const feedingForm = z.object({
   id: madeAtSave(),
-  feed: z.string({ error: "Select a feed" }).min(1, "Select a feed"), // of the pond's site: refusal() checks that
-  feedWeight: reqNum(...RANGES.feedWeight, "Feed weight (g)").refine(
-    (v) => v !== 0,
-    "Feed weight (g) must be more than 0",
-  ),
+  feed: picked("feed"),
+  feedWeight: grams(RANGES.feedWeight, "Feed weight (g)"),
   remarks: note,
 });
 export const feedingSchema = feedingForm.extend(forSave);
+
+export const fertiliserForm = z.object({
+  id: madeAtSave(),
+  fert: picked("fertiliser"),
+  fertWeight: grams(RANGES.fertWeight, "Fertiliser weight (g)"),
+  remarks: note,
+});
+export const fertiliserSchema = fertiliserForm.extend(forSave);
+
+export const treatmentForm = z.object({
+  id: madeAtSave(),
+  treatment: picked("treatment"),
+  treatmentWeight: grams(RANGES.treatmentWeight, "Treatment weight (g)"),
+  remarks: note,
+});
+export const treatmentSchema = treatmentForm.extend(forSave);
 
 const mortality = z.object({
   id: madeAtSave(),
@@ -154,6 +174,8 @@ export const samplingSchema = samplingForm.extend({ ...forSave, fish: fishMeasur
 export const RECORD_KINDS = {
   wq: { form: waterQualityForm, save: waterQualitySchema },
   feeding: { form: feedingForm, save: feedingSchema },
+  fertiliser: { form: fertiliserForm, save: fertiliserSchema },
+  treatment: { form: treatmentForm, save: treatmentSchema },
   mortality: { form: mortalityForm, save: mortalitySchema },
   sampling: { form: samplingForm, save: samplingSchema },
 } as const;

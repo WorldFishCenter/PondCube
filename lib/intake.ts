@@ -2,7 +2,16 @@ import { getTableColumns, sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import type { AnyPgColumn, PgDatabase, PgQueryResultHKT, PgTable } from "drizzle-orm/pg-core";
 import type { z } from "zod";
-import { wqReadings, feedingEvents, mortalityEvents, samplingEvents, fishMeasurements, pond } from "./schema";
+import {
+  wqReadings,
+  feedingEvents,
+  fertiliserEvents,
+  treatmentEvents,
+  mortalityEvents,
+  samplingEvents,
+  fishMeasurements,
+  pond,
+} from "./schema";
 import { mortalityBeforeSpecies, RECORD_KINDS, samplingSchema, type RecordKind } from "./validation";
 
 // Record intake: validate a record of a given kind and persist it, all-or-nothing.
@@ -13,6 +22,8 @@ import { mortalityBeforeSpecies, RECORD_KINDS, samplingSchema, type RecordKind }
 const TABLES = {
   wq: wqReadings,
   feeding: feedingEvents,
+  fertiliser: fertiliserEvents,
+  treatment: treatmentEvents,
   mortality: mortalityEvents,
   sampling: samplingEvents, // plus its fish measurements
 } satisfies Record<RecordKind, PgTable>;

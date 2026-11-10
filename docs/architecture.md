@@ -7,7 +7,7 @@ infrastructure and roadmap decisions; day-to-day coding rules are in
 ## The shape of the system
 
 Operators sign in on a phone or tablet, pick which pond they're at, and record one
-of four kinds of observation. Each record is validated on the device, re-validated
+of six kinds of observation. Each record is validated on the device, re-validated
 on the server, and written whole (or not at all) to a Postgres database. Each
 Operator has their own Clerk account; the server names the Person from it.
 
@@ -17,14 +17,14 @@ device (phone/tablet)                 server (Vercel, sin1)        data (Neon Po
 sign in, pick pond                    POST /api/records:           pond          (static)
 fill a record  ── draft, then ───▶    signed-in operator           operators     (name + email)
   (validated locally)  outbox, in     → re-validate (same zod)      wq_readings
-                       localStorage   → record intake (all/none)   feeding_events
+                       localStorage   → record intake (all/none)   feeding_events, fertiliser_events, treatment_events
                                                         │           mortality_events
                                                         └────────▶  sampling_events + fish_measurements
 ```
 
 ## Data model
 
-Five static dimension tables and five event tables, all keyed on `pond_code`, plus `data_links` and the export views.
+Seven static dimension tables and seven event tables, all keyed on `pond_code`, plus `data_links` and the export views.
 Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 
 - **`site`** — one row per site (WorldFish DMS v5 `SITE`: three-letter `site` code, `name_site`,
@@ -40,16 +40,24 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
 - **`feed`** — the DMS feed list (`feed`, three characters; `note_feed`) with the `sites` that use
   it, mirroring the Airtable `feeds` table. A Feeding event's `feed` (required) points to one; the form offers
   the feeds of the chosen pond's site, and the records route refuses any other.
+- **`fert`** and **`treatment`** — each site's fertilisers and treatments, the same way as `feed`, mirroring the
+  Airtable `fertilisers` and `treatments` tables. `fert` follows the DMS `fert` load file (`fert`, up to four
+  characters; `note_fert`). Treatments have no DMS list (the DMS's `treatment` is a progeny-test design), so a
+  `treatment` is the pond book's name (Lime, Salt, …) with a `note_treatment`. The app shows a Fertiliser or
+  Treatment tab only to an Operator whose sites have that list (Penang has neither).
 - **`species`** — the DMS species list (`species` two-letter code, `species_latin`, `species_common`),
   mirroring the Airtable `species` table. In Airtable a pond's species are links to that table; the
   sync turns the links into the codes. Never removed from Neon.
 - **`operators`** — the people who record, with the email each signs in with and the `sites`
   (one or more codes) whose ponds they see and record. The signed-in operator's name is attached
   to each record as its `person`.
-- **`wq_readings`, `feeding_events`, `mortality_events`** — flat event tables. A water-quality Correction names
+- **`wq_readings`, `feeding_events`, `fertiliser_events`, `treatment_events`, `mortality_events`** — flat event
+  tables. A water-quality Correction names
   the reading of its pond it replaces in `replaces` (no foreign key: that reading may reach the server later, or be
   refused); `export_wq` leaves replaced readings out. A Feeding event is one `feed` and its `feed_weight` in grams,
-  as the pond book's daily FEED n TYPE / FEED n WEIGHT (g): the DMS has no daily feed table. A Mortality record has
+  as the pond book's daily FEED n TYPE / FEED n WEIGHT (g): the DMS has no daily feed table. Fertiliser and
+  Treatment events have the same shape (`fert` + `fert_weight`, `treatment` + `treatment_weight`, grams, over 0 up to
+  100,000 as the pond book's bound per type per day). A Mortality record has
   a `species` (DMS `SPECIES`) and, for one tagged fish, its `pit` (the pond book's PIT; the count is then 1). Both
   columns are nullable and `lib/validation.ts` requires the species; a Record saved on a device before species were
   asked arrives without one, and intake gives it its pond's species when the pond lists exactly one, else none.
@@ -60,7 +68,8 @@ Source of truth is `lib/schema.ts` (Drizzle); don't restate columns elsewhere.
   one or more fish measurements (cascade delete). Intake writes them together or
   not at all.
 - **`data_links`** — one row per sign-in account that has a data link: the SHA-256 of its key, never the key.
-- **Views `export_wq`, `export_feeding`, `export_mortality`, `export_sampling`, `export_pond`** — what people
+- **Views `export_wq`, `export_feeding`, `export_fertiliser`, `export_treatment`, `export_mortality`,
+  `export_sampling`, `export_pond`** — what people
   see of the data, in export names (see [Seeing the data](#seeing-the-data)).
 
 ## Infrastructure
@@ -89,13 +98,13 @@ from a drop plus an add.
 The Airtable base **PondCube** is where people add and edit ponds (`ponds` table) and
 operators (`operators` table: `name`, `email`, `active`, `notes`) by hand. Neon is the system
 of record the app reads and writes. The flow is one-way:
-**Airtable → `npm run db:sync` → Neon `site` / `species` / `feed` / `pond` / `operators`** (or
+**Airtable → `npm run db:sync` → Neon `site` / `species` / `feed` / `fert` / `treatment` / `pond` / `operators`** (or
 `db:sync-ponds`, which brings species with it, and `db:sync-operators`; sites come with both).
 Ponds and operators link to `sites`, ponds to `species`: the sync turns each link into the code,
 and stops if a link points nowhere, an active operator has no site, or a site's `timezone` is missing or isn't
 an IANA name (an offset like `+08:00` is refused: Postgres reads it with the sign flipped). It upserts, so re-run it
-after edits. Never edit ponds or operators directly in Neon. Feeds removed from Airtable stay in Neon
-for the Records that use them, but are offered nowhere.
+after edits. Never edit ponds or operators directly in Neon. Feeds, fertilisers and treatments removed from
+Airtable stay in Neon for the Records that use them, but are offered nowhere.
 
 - **Checked first, all-or-nothing.** Every Airtable row is checked (required columns,
   numbers, dates, pond code format, duplicates) before anything is written; any problem
@@ -297,7 +306,7 @@ builds a file from a few test readings and checks key cells against them; when t
 compares the two with openpyxl tab for tab: names, frozen panes, merged cells, tables and each tab's header rows.
 Nothing checks the rest of the sample cell for cell.
 
-**Way in 2: the data link** (`GET /api/data/{wq,feeding,mortality,sampling,ponds}.csv?key=…`). A secret key per
+**Way in 2: the data link** (`GET /api/data/{wq,feeding,fertiliser,treatment,mortality,sampling,ponds}.csv?key=…`). A secret key per
 sign-in account, made in the app (`POST /api/data-link`) and shown once; `data_links` keeps only its hash. Making
 a new one replaces the old, which stops working. Each request looks the key's account up in Clerk and runs it
 through `accessFor`, so the CSVs follow the operator list: removed, deactivated or moved to another site, and the
@@ -310,7 +319,8 @@ The key travels in the address (`?key=`), as Excel's "Web API" credential and Go
 So it shows in Vercel's request logs (project team only) and in any "From Web" URL someone pastes. Only its hash is
 stored; a leaked key is stopped by making a new link.
 
-**What the app shows with a new link.** A tab each for Google Sheets and Excel, with a line per CSV to copy:
+**What the app shows with a new link.** A tab each for Google Sheets and Excel, with a line per CSV to copy (only
+the Record kinds the Operator has a tab for: no fertiliser or treatment line at Penang; the files still answer, empty):
 `=IMPORTDATA("…")` for cell A1 of a sheet, or the address for Excel for the web (Data → Get Data → Web API, then
 Anonymous). Both put the key in the file, and the app says so: share that file only with people who may see the
 records. The template below keeps the key out of the workbook, on Excel 365 for Windows.
@@ -358,7 +368,7 @@ For Excel 365 on Windows. Each person who refreshes it needs their own data link
    same date as a real date, for pivots and charts.
 3. When Excel asks how to connect: Web API, paste the key, set the level to the app's address, Connect.
 4. Name the query `wq`, then Close & Load To → Table, on a new sheet. Repeat for `feeding`, `mortality`,
-   `sampling` and `ponds` (right-click the query → Duplicate, change the file name; type their number columns
+   `sampling` and `ponds` (and `fertiliser`, `treatment` where used) (right-click the query → Duplicate, change the file name; type their number columns
    the same way).
 5. Tank × day, one per period: Insert → PivotTable from the `wq` table. Filters: AREA, PERIOD; Rows: TANK;
    Columns: DAY (right-click → Ungroup, so each day is its own column); Values: Average of DISSOLVED_OXYGEN and
@@ -408,7 +418,7 @@ cp .env.example .env
 
 npm install
 npm run db:push     # create tables in the dev branch
-npm run db:sync     # copy sites, species, feeds, ponds + operators from Airtable
+npm run db:sync     # copy sites, species, feeds, fertilisers, treatments, ponds + operators from Airtable
 npm run dev         # http://localhost:3000
 ```
 
@@ -459,4 +469,7 @@ npm run dev         # http://localhost:3000
    app older than 0.12.0 can't store a Feeding event: it waits on the phone and sends once that phone has 0.12.0,
    which reads it as grams. Last, `scripts/migrate-0.12.0-mortality.sql` (a Mortality record's `species` and `pit`),
    the same way, with `export_mortality` recreated in its transaction. It only adds, so older apps keep storing
-   Mortality records (without either). Applied to dev on 2026-11-06 and to production on 2026-11-07.
+   Mortality records (without either). Applied to dev on 2026-11-06 and to production on 2026-11-07. Then
+   `scripts/migrate-0.12.0-inputs.sql` (Fertiliser and Treatment events and their site lists): new tables and two
+   new views only, created in the same transaction, then `npm run db:sync` for the lists (`-- --prod` there). Older
+   apps work unchanged on it (checked with feat/feedback's code on dev). Applied to dev and production on 2026-11-10.

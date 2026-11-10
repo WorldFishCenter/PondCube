@@ -2,7 +2,17 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, asc, eq, getViewSelectedFields, inArray, like, max, min, type SQL } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT, PgView } from "drizzle-orm/pg-core";
 import { accessFor, type Access } from "./operators";
-import { dataLinks, feedingView, mortalityView, pondView, PROVISIONAL as P, samplingView, wqView } from "./schema";
+import {
+  dataLinks,
+  feedingView,
+  fertiliserView,
+  mortalityView,
+  pondView,
+  PROVISIONAL as P,
+  samplingView,
+  treatmentView,
+  wqView,
+} from "./schema";
 
 // Seeing the data: the one reader behind the download and the data link, and the data link's keys.
 // No server-only import, so scripts/check-export.ts can test it; lib/access.ts wires in Clerk.
@@ -12,6 +22,8 @@ type Db = PgDatabase<PgQueryResultHKT>;
 export const VIEWS = {
   wq: wqView,
   feeding: feedingView,
+  fertiliser: fertiliserView,
+  treatment: treatmentView,
   mortality: mortalityView,
   sampling: samplingView,
   ponds: pondView,

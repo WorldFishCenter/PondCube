@@ -61,6 +61,8 @@ async function main() {
   });
   await db.insert(schema.pond).values([talPond("TAL_01", ["CC", "LR"]), talPond("TAL_32", [])]);
   await db.insert(schema.feed).values({ feed: "SUP", sites: ["PEN"] });
+  await db.insert(schema.fert).values({ fert: "UREA", sites: ["TAL"] });
+  await db.insert(schema.treatment).values({ treatment: "Lime", sites: ["TAL"] });
   const who = { pondCode: "PEN-FT1-001" };
   const recordedAt = new Date("2026-10-09T00:30:00.000Z");
   const rows = async (table: PgTable) => (await db.select({ n: count() }).from(table))[0].n;
@@ -201,6 +203,27 @@ async function main() {
   await assert.rejects(save("mortality", { ...tal, mortalityCount: "-1" }));
   await save("mortality", { id: old.a, ...who, recordedAt, mortalityCount: "2" }); // a resend: still stored once
   assert.equal(await rows(schema.mortalityEvents), 6);
+
+  // Fertiliser and Treatment events: one item of the site's list and its grams, up to 100,000.
+  const talAt = { pondCode: "TAL_01", recordedAt };
+  await save("fertiliser", { ...talAt, fert: "UREA", fertWeight: "100000", remarks: "" });
+  await save("treatment", { ...talAt, treatment: "Lime", treatmentWeight: "2500,5", remarks: "after rain" });
+  assert.deepEqual(
+    (await db.select().from(schema.fertiliserEvents)).map((f) => [f.pondCode, f.fert, f.fertWeight, f.remarks]),
+    [["TAL_01", "UREA", 100000, null]],
+  );
+  assert.deepEqual(
+    (await db.select().from(schema.treatmentEvents)).map((t) => [t.treatment, t.treatmentWeight, t.appVersion]),
+    [["Lime", 2500.5, "9.9.9"]],
+  );
+  await assert.rejects(save("fertiliser", { ...talAt, fert: "UREA", fertWeight: "100001" }));
+  await assert.rejects(save("fertiliser", { ...talAt, fert: "UREA", fertWeight: "0" }));
+  await assert.rejects(save("fertiliser", { ...talAt, fertWeight: "10" })); // no Fertiliser
+  await assert.rejects(save("fertiliser", { ...talAt, fert: "XXXX", fertWeight: "10" })); // not on any list
+  await assert.rejects(save("treatment", { ...talAt, treatment: "Lime", treatmentWeight: "" }));
+  await assert.rejects(save("treatment", { ...talAt, treatment: "Bleach", treatmentWeight: "10" }));
+  assert.equal(await rows(schema.fertiliserEvents), 1);
+  assert.equal(await rows(schema.treatmentEvents), 1);
 
   // The Person is the caller's (the signed-in Operator), whatever the device sends.
   await save("feeding", { ...who, recordedAt, feed: "SUP", feedWeight: "1", person: "Someone else" });

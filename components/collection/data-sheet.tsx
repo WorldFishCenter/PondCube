@@ -32,7 +32,14 @@ import { Choice, FILLED_TAB } from "./record-form";
 // Seeing the data (docs/architecture.md): a month of water quality as an Excel file, and a data link of CSVs.
 const MONTHS = 24; // ponytail: the last two years; offer older months when someone asks
 
-export function DataSheet({ sites, kinds }: { sites: string[]; kinds: Record<RecordKind, { label: string }> }) {
+/** `kinds`: the Record kinds this Operator has a tab for; the data link lists only their files. */
+export function DataSheet({
+  sites,
+  kinds,
+}: {
+  sites: string[];
+  kinds: Partial<Record<RecordKind, { label: string }>>;
+}) {
   const yours = sites.length > 1 ? "your sites" : "your site";
   return (
     <Sheet>
@@ -117,7 +124,7 @@ const APPS = [
   },
 ];
 
-function DataLink({ yours, labels }: { yours: string; labels: Record<ViewName, { label: string }> }) {
+function DataLink({ yours, labels }: { yours: string; labels: Partial<Record<ViewName, { label: string }>> }) {
   const [link, setLink] = React.useState<{ key: string; links: Record<ViewName, string> }>();
   const [state, setState] = React.useState<"idle" | "making" | "failed">("idle");
   const make = async () => {
@@ -148,8 +155,9 @@ function DataLink({ yours, labels }: { yours: string; labels: Record<ViewName, {
             {APPS.map((app) => (
               <TabsContent key={app.name} value={app.name} className="flex flex-col gap-3 pt-2">
                 <Steps steps={app.steps} />
-                {Object.entries(link.links).map(([file, url]) => {
-                  const { label } = labels[file as ViewName];
+                {Object.entries(link.links).flatMap(([file, url]) => {
+                  const label = labels[file as ViewName]?.label;
+                  if (!label) return [];
                   const line = app.paste(url);
                   return (
                     <InputGroup key={file}>

@@ -3,7 +3,7 @@ import { cacheLife } from "next/cache";
 import { and, arrayOverlaps, asc, eq, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { findOperator } from "./operators";
-import { feed, pond, species } from "./schema";
+import { feed, fert, pond, species, treatment } from "./schema";
 
 // Page reads. Cached so the page prerenders and skips Neon on each request; DB edits show up within ~1 minute.
 
@@ -40,6 +40,28 @@ export async function getFeeds(sites: string[]) {
     .from(feed)
     .where(arrayOverlaps(feed.sites, sites))
     .orderBy(asc(feed.feed));
+}
+
+/** Fertilisers used at any of these sites, with the sites that use each. */
+export async function getFerts(sites: string[]) {
+  "use cache";
+  cacheLife("minutes");
+  return db
+    .select({ fert: fert.fert, noteFert: fert.noteFert, sites: fert.sites })
+    .from(fert)
+    .where(arrayOverlaps(fert.sites, sites))
+    .orderBy(asc(fert.fert));
+}
+
+/** Treatments used at any of these sites, with the sites that use each. */
+export async function getTreatments(sites: string[]) {
+  "use cache";
+  cacheLife("minutes");
+  return db
+    .select({ treatment: treatment.treatment, noteTreatment: treatment.noteTreatment, sites: treatment.sites })
+    .from(treatment)
+    .where(arrayOverlaps(treatment.sites, sites))
+    .orderBy(asc(treatment.treatment));
 }
 
 /** Every species, for a pond that lists none. */

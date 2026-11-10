@@ -10,6 +10,9 @@ features the second, fixes the third.
 
 - Mortality records now say which species died, at every site. Pick it from the pond's species, shown with its common name, such as "CC (Catla)". If the pond has only one species, it's already picked. The species is required.
 - A mortality record can also have a fish's PIT tag: 10 characters, numbers 0 to 9 and letters A to F, such as 00075D5F96. A record with a PIT tag is that one fish, so its number of dead fish must be 1. Without a PIT tag, it's a count of dead fish, as before. The PIT tag box takes ordinary text, so a tag reader that types into the phone can fill it in.
+- Two new tabs, Fertiliser and Treatment, that work like Feeding: one record for each fertiliser or treatment (such as lime, salt or a medicine against parasites) given to a pond, picked from your site's list, with its weight in grams. The weight must be more than 0 g and at most 100,000 g, the pond book's limit for one kind on one day. Set the date and time above the form, as on the Feeding tab.
+- Only people at a site that has these lists see the new tabs. Penang has none, so nothing changes there. Talbaria's lists come from its 2025 pond book: Urea, TSP, MOC, Yeast, Molasses and Rice polish; Lime, Timsen, Acimec, Salt, TSC (tea seed cake) and Paratics.
+- Data links: two new files, fertiliser and treatment, laid out like the feeding file. They're listed only for people whose site has those lists.
 
 ### Changed
 

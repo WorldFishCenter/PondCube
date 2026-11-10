@@ -128,6 +128,16 @@ name one tagged fish by its `pit` (the pond book's `PIT`; the count is then 1), 
 new columns, so nothing stored changes; no Mortality record existed on dev or production. One saved on a device before
 it gets its pond's species when the pond lists exactly one, else none.
 
+**Also in 0.12.0 (2026-11-10)**: two new Record kinds shaped like the Feeding event, Fertiliser events and Treatment
+events: one item of the site's list and its weight in grams (`fert_weight`, `treatment_weight`), over 0 and up to
+100 000 g, the pond book's bound per type per day, with `remarks` (see 2.5). Each site has its own lists in Airtable
+(`fertilisers`, `treatments`), synced like feeds. Fertilisers follow the DMS `fert` load file (`fert`, up to four
+characters, and `note_fert`). Treatments have no DMS list, and the DMS's `treatment` is a progeny-test design, so the
+app keeps the pond book's word, identifies each by the pond book's name, and marks the export headers provisional (Q15).
+Talbaria's lists come from the 2025 pond book (1.5); Penang has neither, so its Operators see no Fertiliser or
+Treatment tab (Matt: lime and fertiliser aren't used there). Data links get two files, `fertiliser.csv` and
+`treatment.csv`, laid out like the feeding file.
+
 **Waiting for Matt**: the rest of this document. First the site code and the pond numbers (Q3, Q4). Then the Record
 fields and their values. Each further rename also needs Records still waiting on devices read under the new names, as
 was done for this one.
@@ -137,7 +147,7 @@ was done for this one.
 - The standard has two layers. The DMS is the genetics database: individual fish, families, spawning, deaths,
   transfers, measurements. v3 said pond environment and management data live in a separate system, the pond book,
   which records water chemistry, feed, fertiliser, treatments, fish and water transfers, deaths and random samples per
-  pond per day; v5 drops that sentence but still has no tables for them. Our four Record kinds belong to the pond
+  pond per day; v5 drops that sentence but still has no tables for them. Our six Record kinds belong to the pond
   book's layer. The DMS supplies the naming grammar and identifier formats.
 - Most of our terms have a standard equivalent with the same meaning and a different name. The units mostly agree:
   mg/l, °C, g, cm.
@@ -151,8 +161,7 @@ was done for this one.
   grams per feed. Mortality causes now match the DMS's eleven.
 - The two sources disagree with each other on a few points: pond area unit, species value, one death cause, pond
   category, header spelling. The DMS wins (Q1).
-- The standard records things we don't yet: fish transfers, water transfers, fertiliser, treatments, Secchi disc and
-  water depth, per-species random samples, pond category (the DMS's cohort).
+- The standard records things we don't yet: fish transfers, water transfers, Secchi disc and water depth, per-species random samples, pond category (the DMS's cohort).
 
 ## 1. The standard
 
@@ -225,7 +234,7 @@ In 2025 the logs hold 76 120 fish transfer rows, 18 025 fish death rows (one per
 | `measure_data`              | `INDIV`, `MEASURE_EVENT`, one column per trait (`WT`, `LEN_ST`, `WIDTH`, `DEPTH`, …), `PERSON`, `NOTE_MEASURE`, `DATE_MEASURE`                                                                                                                    |
 | `measure_event`             | `MEASURE_EVENT`, `ALLOW_REPEAT`, `NOTE_MEASURE_EVENT`. Examples: `TAG`, `HARV`, `POST_HARV`, `MONITOR` ("Routine monitoring of ponds", repeatable)                                                                                                |
 | `trait`                     | `TRAIT`, `NAME_TRAIT`, `UNITS`, `MIN`, `MAX`, `TYPE`, `CATEGORY`, `BODY_PART`, `PRIMARY_TR` (new in v5), `NOTE_TRAIT`. Examples: `WT` total weight, g, 0–20 000 (v3); `LEN_ST` standard length, cm, 0–100; `LEN_TOT` total length, cm, 0–100 (v5) |
-| `feed`, `fert`, `treatment` | Treatment codes for progeny tests (`CULTURE` M/P, `FEED`, `FERT`, `NEST_TREAT`), not daily applications                                                                                                                                           |
+| `feed`, `fert`, `treatment` | Treatment codes for progeny tests (`CULTURE` M/P, `FEED`, `FERT`, `NEST_TREAT`), not daily applications. Our feed and fertiliser lists borrow `FEED` and `FERT`; `treatment` clashes (Q15)                                                        |
 
 The rest of the DMS (spawning, tagging, families, hapas, founders, EBVs, tissue samples, dissemination) is genetics work
 outside PondCube Collect.
@@ -245,8 +254,13 @@ outside PondCube Collect.
   instead, `COHORT_DESC`: `PREGROWOUT`, `GROWOUT`, `TRIAL`, `BACKUP`, `BROOD`, `PARENTS`, `OTHER`.
 - **Feed type**: product names with composition (protein, carbohydrate, fat, ash, moisture %): Mega Nursery Powder,
   Mega Pre Starter, Mega Carp Grower, Nutri-egg, Tiger nursery feed.
-- **Fertiliser type**: Urea, TSP, MOC, Yeast, Molasses, Rice_Polish.
-- **Treatment type**: Lime, Timsen, Acimec, Salt, TSC (tea seed cake), Paratics.
+- **Fertiliser type**: Urea, TSP (Triple Super Phosphate), MOC (Mixed Oilseed Cake), Yeast (_Saccharomyces
+  cerevisiae_ with vegetable oil, sorbitan monostearate, ascorbic acid, arabic gum), Molasses, Rice_Polish (rice
+  polish). Used in 2025: MOC 106, Urea 102, TSP 99 pond-days. In the app (Talbaria's list) as `UREA`, `TSP`, `MOC`,
+  `YEAS`, `MOLA`, `RICE`; the last three are made up ("Code provisional" in `note_fert`).
+- **Treatment type**: Lime (calcium carbonate), Timsen (n-alkyl dimethyl benzyl ammonium chloride), Acimec (ivermectin
+  BP), Salt (sodium chloride), TSC (tea seed cake), Paratics (deltamethrin). Used in 2025: Paratics 170, Lime 86, Salt
+  72, TSC 10 pond-days. In the app (Talbaria's list) by these names.
 - **Period**: MORNING, MIDDAY, AFTERNOON (column groups, each with its own time).
 - **Measurement event** (DMS): `TAG`, `HARV`, `POST_HARV`, and in v5 `MONITOR`.
 
@@ -281,6 +295,8 @@ Match: **same** (name and meaning agree), **rename** (same meaning, different na
 | Water-quality reading         | Water chemistry                                    | rename |                                                              |
 | Period                        | MORNING / MIDDAY / AFTERNOON                       | recode | Q8                                                           |
 | Feeding event                 | Feed                                               | rename | One feed per Record, as in the pond book, 2.5                |
+| Fertiliser, Fertiliser event  | `FERT`; Fertiliser (pond book)                     | rename | One fertiliser per Record, 2.5                               |
+| Treatment, Treatment event    | Treatment (pond book); DMS `treatment` differs     | none   | One treatment per Record, 2.5; the name clashes, Q15         |
 | Mortality record              | Fish death (summary row)                           | rename |                                                              |
 | Sampling event                | Random sample (pond book); measurement event (DMS) | rename | Exported as `MEASURE_EVENT` `MONITOR` (v5); Q11              |
 | Fish measurement              | Trait values `WT`, `LEN_ST`                        | rename |                                                              |
@@ -335,7 +351,7 @@ Match: **same** (name and meaning agree), **rename** (same meaning, different na
 | `remarks`                        | `REMARKS`                          | same   |                                         |
 | — (time is inside `recorded_at`) | `TIME <PERIOD>`                    | same   | Our instant includes the time           |
 
-### 2.5 Feeding event (`feeding_events`) → feed
+### 2.5 Feeding, Fertiliser and Treatment events → feed, fertiliser, treatment
 
 The DMS has no daily feed table. The pond book records, per pond per day, up to three feeds, each a type and its weight
 in grams; feed is Talbaria's daily routine (6,287 pond-days in 2025). Since 0.12.0 (decided 2026-11-06, every site) a
@@ -349,6 +365,18 @@ three Feeding events. Each sets its own Recorded-at above the form, as before.
 | `feed_weight` (was `feed_amount_kg`) | `FEED n WEIGHT` (g)    | done  | Grams, over 0 up to 15,000 (the pond book's bound); `FEED_WEIGHT` in exports |
 | (was `feedings_count`)               | —                      | done  | Removed; on devices, an old number goes in `remarks`                         |
 | `remarks`                            | `REMARKS`              | same  |                                                                              |
+
+Fertiliser events (`fertiliser_events`) and Treatment events (`treatment_events`), since 0.12.0, have the same shape:
+the pond book's `FERTILISER n TYPE` / `WEIGHT` and `TREATMENT n TYPE` / `WEIGHT` (g), up to three a day, each its own
+Record. They are recorded only at sites with that list (Talbaria; not Penang).
+
+| Ours                                      | Standard                                      | Match  | Note                                                          |
+| ----------------------------------------- | --------------------------------------------- | ------ | ------------------------------------------------------------- |
+| `fert` (list `fert`: `fert`, `note_fert`) | `FERT`, `NOTE_FERT` / `FERTILISER n TYPE`     | same   | Up to four characters; each site's list, in Airtable          |
+| `fert_weight`                             | `FERTILISER n WEIGHT` (g)                     | rename | Over 0 up to 100,000 g; `FERT_WEIGHT` in exports, provisional |
+| `treatment` (list `treatment`)            | `TREATMENT n TYPE`; not the DMS's `treatment` | none   | The pond book's name, e.g. Lime; `TREATMENT` provisional, Q15 |
+| `treatment_weight`                        | `TREATMENT n WEIGHT` (g)                      | rename | Over 0 up to 100,000 g; `TREATMENT_WEIGHT`, provisional       |
+| `remarks`                                 | `REMARKS`                                     | same   |                                                               |
 
 ### 2.6 Mortality record (`mortality_events`) → fish death
 
@@ -397,6 +425,8 @@ keeps individual values per tagged fish.
 | Ammonia          | 0–100 mg/l                       | 0–50                           | —                    |
 | Nitrite, nitrate | 0–100, 0–500 mg/l                | —                              | —                    |
 | Feed             | over 0, up to 15 000 g per feed  | 0–15 000 g per product per day | —                    |
+| Fertiliser       | over 0, up to 100 000 g          | 0–100 000 g per type per day   | —                    |
+| Treatment        | over 0, up to 100 000 g          | 0–100 000 g per type per day   | —                    |
 | Fish weight      | over 0, up to 20 000 g           | mean 0–15 000 g                | `WT` 0–20 000 g (v3) |
 | Fish length      | over 0, up to 100 cm (standard)  | —                              | `LEN_ST` 0–100 cm    |
 | Dead fish count  | 0–1 000 000                      | —                              | —                    |
@@ -413,6 +443,10 @@ The bounds differ but nothing conflicts by name. Q8 asks whether program-wide Ra
 | Readings    | Oxygen (mg/L), Temperature, pH, Ammonia (mg/L)                 | DISOLVED OXYGEN, TEMPERATURE, pH, AMMONIA (mg/l)  |
 | Tab         | Feeding                                                        | FEED                                              |
 | Feed        | Feed; Feed weight (g)                                          | FEED TYPE; FEED WEIGHT (g)                        |
+| Tab         | Fertiliser (only at a site with a list)                        | FERTILISER                                        |
+| Fertiliser  | Fertiliser; Fertiliser weight (g)                              | FERTILISER TYPE; FERTILISER WEIGHT (g)            |
+| Tab         | Treatment (only at a site with a list)                         | TREATMENT                                         |
+| Treatment   | Treatment; Treatment weight (g)                                | TREATMENT TYPE; TREATMENT WEIGHT (g)              |
 | Tab         | Mortality                                                      | FISH DEATH                                        |
 | Deaths      | Species; PIT tag; Number of dead fish; Cause of death; Remarks | SPECIES; PIT; COUNT_DEAD; CAUSE OF DEATH; REMARKS |
 | Tab         | Sampling                                                       | RANDOM SAMPLE                                     |
@@ -452,8 +486,6 @@ Each item names the question it waits on.
 | Species on fish records   | `SPECIES` (2-letter code)                                                                                         | Deaths done (0.12.0); samples and transfers next |
 | Fish transfers            | Date, species, from pond, to pond, to-pond category, count (or PIT per fish); DMS v5 `fish_trans` per tagged fish | Also stocking at year start and from the nursery |
 | Water transfers           | Date, from pond, to pond, pump time (hours)                                                                       | `BORE` as source                                 |
-| Fertiliser                | Type (list), weight (g), up to 3 per day                                                                          |                                                  |
-| Treatments                | Type (list), weight (g), up to 3 per day                                                                          | Lime, salt, antiparasitics                       |
 | Secchi disc, water depth  | Time, Secchi disc (cm), water depth (cm)                                                                          |                                                  |
 | Midday water chemistry    | Third period with its own time                                                                                    |                                                  |
 | Random sample per species | Count and mean weight per species                                                                                 | Derivable from our fish measurements             |
@@ -531,7 +563,7 @@ Each question has our proposal so a yes is enough.
 **People and notes**
 
 12. `PERSON` now names who recorded a Record and holds the full name (decided). Free text follows `NOTE_<ENTITY>`
-    where the DMS has the entity; Water-quality readings, Feeding events and Sampling events keep `remarks` / `notes`
+    where the DMS has the entity; Water-quality readings, Feeding, Fertiliser and Treatment events and Sampling events keep `remarks` / `notes`
     (decided: the DMS doesn't cover them).
 
 **Dates**
@@ -543,13 +575,23 @@ Each question has our proposal so a yes is enough.
 
 14. Which of our extras (section 5) may stay, and under what names?
 
+**Fertiliser and treatment**
+
+15. The DMS's `treatment` (and `pond_treat`) is a progeny-test design; the pond book's TREATMENT is something given to a
+    pond (lime, salt, an antiparasitic). The app keeps the pond book's word: Treatment events, a `treatment` list by
+    the pond book's names, and export headers `TREATMENT` and `TREATMENT_WEIGHT`, marked provisional. Which name should
+    these have in the standard? And are fertiliser codes of up to four characters right (`UREA`, `TSP`, `MOC`; `YEAS`,
+    `MOLA`, `RICE` made up), with `FERT_WEIGHT` for the grams? _Proposal: keep "Treatment" in the app and rename only
+    the export headers, once, to whatever you choose; confirm or replace the made-up fertiliser codes._
+
 ## 7. Scaling to more sites
 
 - Done: one `site` table that ponds and operators point to, and Operators limited to their own sites' ponds.
 - Pond codes start with the site code, in our format and in the standard's, so they stay unique across sites.
 - Done: each site's time zone (`timezone`, an IANA name, in the Airtable `sites` table), which the exports use to
   turn our exact instants into the DMS's local dates (`YYYYMMDD`). The DMS has no field for it.
-- Done: each site's own feed list, edited in Airtable.
+- Done: each site's own feed, fertiliser and treatment lists, edited in Airtable. A site without a fertiliser or
+  treatment list shows no such tab: the first screen that differs by site.
 
 ## 8. Tagged fish
 
